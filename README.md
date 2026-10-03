@@ -1,1 +1,3 @@
 book-to-course is a Claude skill that converts a book into a complete interactive course delivered as a local web page. Give it an EPUB, PDF, HTML, DOCX, Markdown or text file and it writes beginner-friendly lessons with animated walkthroughs, quizzes, chapter tests and flashcards. For programming books it also creates exercises with starter code and unit tests, and it verifies that each test fails on the starter and passes on the reference solution. Learner progress is stored in plain files, and no backend or build step is needed.
+
+The skill and all its supporting files are in [`book-to-course/`](book-to-course/SKILL.md).
