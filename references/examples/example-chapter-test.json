@@ -1,0 +1,81 @@
+{
+  "title": "Test: pierwszy program",
+  "kind": "test",
+  "summary": "Sprawdź wiedzę z całego rozdziału.",
+  "blocks": [
+    {
+      "type": "quiz",
+      "id": "test-ch01",
+      "pass_score": 0.6,
+      "questions": [
+        {
+          "type": "single",
+          "q": "Który pakiet wypisuje tekst?",
+          "options": [
+            "fmt",
+            "os",
+            "io",
+            "net"
+          ],
+          "answer": 0,
+          "hint": "Skrót od format.",
+          "explanation": "`fmt` służy do formatowania i wypisywania."
+        },
+        {
+          "type": "single",
+          "q": "Jak uruchomić plik main.go?",
+          "options": [
+            "go run main.go",
+            "run go main.go",
+            "start main.go",
+            "exec main"
+          ],
+          "answer": 0,
+          "hint": "Pierwsze słowo to nazwa narzędzia.",
+          "explanation": "`go run`."
+        },
+        {
+          "type": "truefalse",
+          "q": "Program może działać bez funkcji main.",
+          "answer": false,
+          "hint": "Gdzie zaczyna się wykonanie?",
+          "explanation": "Bez `main` nie ma punktu startu."
+        },
+        {
+          "type": "fill",
+          "q": "Słowo kluczowe definiujące funkcję to ___.",
+          "answer": "func",
+          "hint": "Skrót od function.",
+          "explanation": "`func`."
+        },
+        {
+          "type": "multi",
+          "q": "Co robi kompilator?",
+          "options": [
+            "tłumaczy kod",
+            "wykonuje pętlę w głowie",
+            "tworzy program",
+            "pisze testy"
+          ],
+          "answer": [
+            0,
+            2
+          ],
+          "hint": "Dwie odpowiedzi.",
+          "explanation": "Tłumaczy kod i tworzy program."
+        },
+        {
+          "type": "order",
+          "q": "Ułóż etapy:",
+          "items": [
+            "Kod",
+            "Kompilacja",
+            "Uruchomienie"
+          ],
+          "hint": "Od pisania do wyniku.",
+          "explanation": "Kolejność etapów."
+        }
+      ]
+    }
+  ]
+}

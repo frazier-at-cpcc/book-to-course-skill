@@ -1,0 +1,226 @@
+{
+  "title": "Hello, world — od czego zaczyna się program",
+  "summary": "Zobaczysz najmniejszy program w Go i zrozumiesz każdy jego wiersz.",
+  "source": {
+    "chapter": "ch01",
+    "sections": [
+      "Hello, world"
+    ]
+  },
+  "blocks": [
+    {
+      "type": "text",
+      "md": "Po tej lekcji **napiszesz i uruchomisz** swój pierwszy program. Zaczniemy od najmniejszego programu, jaki da się napisać w Go, i rozbierzemy go na części."
+    },
+    {
+      "type": "callout",
+      "kind": "analogy",
+      "md": "Program jest jak **przepis kulinarny**: lista kroków, które komputer wykonuje po kolei. Funkcja `main` to pierwszy krok przepisu."
+    },
+    {
+      "type": "stepper",
+      "title": "Rozbieramy program wiersz po wierszu",
+      "lang": "go",
+      "steps": [
+        {
+          "title": "Pakiet",
+          "md": "Każdy plik w Go zaczyna się od nazwy pakietu. `main` oznacza: *to jest program, który można uruchomić*.",
+          "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, world\")\n}",
+          "highlight": [
+            1
+          ]
+        },
+        {
+          "title": "Import",
+          "md": "`import` pozwala użyć gotowego kodu. Pakiet `fmt` potrafi wypisywać tekst na ekran.",
+          "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, world\")\n}",
+          "highlight": [
+            3
+          ]
+        },
+        {
+          "title": "Funkcja main",
+          "md": "Komputer zaczyna wykonywanie od funkcji `main`. Wszystko w klamrach `{ }` to jej treść.",
+          "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, world\")\n}",
+          "highlight": [
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "title": "Wypisanie tekstu",
+          "md": "`fmt.Println` wypisuje tekst i przechodzi do nowej linii.",
+          "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, world\")\n}",
+          "highlight": [
+            6
+          ],
+          "output": "Hello, world"
+        }
+      ]
+    },
+    {
+      "type": "from_book",
+      "source": "rozdz. 1",
+      "md": "Każdy program zaczyna się od pakietu `main`, bo kompilator szuka funkcji `main` jako punktu startu."
+    },
+    {
+      "type": "flow",
+      "title": "Droga od kodu do wyniku",
+      "nodes": [
+        {
+          "label": "Piszesz kod",
+          "detail": "Tworzysz plik `main.go` w edytorze."
+        },
+        {
+          "label": "go run",
+          "detail": "Polecenie `go run main.go` zleca kompilację i uruchomienie."
+        },
+        {
+          "label": "Kompilator",
+          "detail": "Zamienia tekst programu na kod zrozumiały dla procesora."
+        },
+        {
+          "label": "Wynik",
+          "detail": "Na ekranie pojawia się `Hello, world`."
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Słowo",
+        "Znaczenie"
+      ],
+      "rows": [
+        [
+          "`package`",
+          "nazwa paczki kodu"
+        ],
+        [
+          "`import`",
+          "wczytanie gotowego kodu"
+        ],
+        [
+          "`func`",
+          "definicja funkcji"
+        ]
+      ]
+    },
+    {
+      "type": "svg",
+      "caption": "Program składa się z pakietu, importów i funkcji.",
+      "svg": "<svg viewBox=\"0 0 320 90\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"5\" y=\"5\" width=\"310\" height=\"80\" rx=\"10\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><animate attributeName=\"stroke-dasharray\" from=\"0 800\" to=\"800 0\" dur=\"1.2s\" fill=\"freeze\"/></rect><text x=\"20\" y=\"35\" font-size=\"14\" fill=\"currentColor\">package main</text><text x=\"20\" y=\"58\" font-size=\"14\" fill=\"currentColor\">func main() {...}</text></svg>"
+    },
+    {
+      "type": "reveal",
+      "prompt": "Co się stanie, jeśli zmienisz `main` na `start`?",
+      "md": "Program się nie uruchomi — kompilator szuka funkcji o nazwie `main`."
+    },
+    {
+      "type": "quiz",
+      "id": "q-hello",
+      "title": "Sprawdź, co zapamiętałeś",
+      "questions": [
+        {
+          "type": "single",
+          "q": "Od której funkcji zaczyna się wykonywanie programu?",
+          "options": [
+            "start",
+            "main",
+            "run",
+            "init2"
+          ],
+          "answer": 1,
+          "hint": "Nazwa pasuje do nazwy pakietu.",
+          "explanation": "Go zawsze zaczyna od funkcji `main` w pakiecie `main`."
+        },
+        {
+          "type": "truefalse",
+          "q": "`fmt.Println` wypisuje tekst na ekran.",
+          "answer": true,
+          "hint": "Print = wypisz.",
+          "explanation": "Tak — `fmt` to pakiet do formatowania i wypisywania."
+        },
+        {
+          "type": "multi",
+          "q": "Które z poniższych są słowami kluczowymi Go?",
+          "options": [
+            "func",
+            "import",
+            "hello",
+            "package"
+          ],
+          "answer": [
+            0,
+            1,
+            3
+          ],
+          "hint": "Jedno z nich to zwykły tekst.",
+          "explanation": "`func`, `import` i `package` należą do języka; `hello` nie."
+        },
+        {
+          "type": "fill",
+          "q": "Uzupełnij: polecenie uruchamiające plik to `go ___ main.go`.",
+          "answer": [
+            "run"
+          ],
+          "hint": [
+            "Zaczyna się na r.",
+            "Ma trzy litery."
+          ],
+          "explanation": "`go run` kompiluje i od razu uruchamia program."
+        },
+        {
+          "type": "order",
+          "q": "Ułóż kroki w kolejności:",
+          "items": [
+            "Piszesz kod",
+            "Uruchamiasz go run",
+            "Kompilator tłumaczy kod",
+            "Widzisz wynik"
+          ],
+          "hint": "Zacznij od tego, co robisz sam.",
+          "explanation": "Najpierw kod, potem polecenie, kompilacja i wynik."
+        }
+      ]
+    },
+    {
+      "type": "flashcards",
+      "id": "fc-hello",
+      "title": "Fiszki: pojęcia z lekcji",
+      "cards": [
+        {
+          "front": "package main",
+          "back": "Oznacza program, który można uruchomić."
+        },
+        {
+          "front": "fmt",
+          "back": "Pakiet do wypisywania i formatowania tekstu."
+        },
+        {
+          "front": "func main()",
+          "back": "Punkt startowy programu."
+        }
+      ]
+    },
+    {
+      "type": "summary",
+      "points": [
+        "Program w Go zaczyna się od `package main` i funkcji `main`.",
+        "`import` wczytuje gotowy kod, np. `fmt`.",
+        "`go run main.go` kompiluje i uruchamia program."
+      ]
+    }
+  ],
+  "terms": [
+    {
+      "term": "kompilator",
+      "def": "program, który zamienia kod źródłowy na kod wykonywalny"
+    },
+    {
+      "term": "pakiet",
+      "def": "zbiór powiązanego kodu pod jedną nazwą"
+    }
+  ]
+}

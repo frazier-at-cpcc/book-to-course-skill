@@ -1,0 +1,1 @@
+{"title":"Iloczyn","language":"go","command":["go","test","-count=1","./..."],"timeout":90,"starter":["go.mod","main.go"],"tests":["main_test.go"]}
