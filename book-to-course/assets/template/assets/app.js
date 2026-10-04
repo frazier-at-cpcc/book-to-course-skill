@@ -58,7 +58,7 @@ const STR = {
     timedOut: "Time limit exceeded — check for an infinite loop.", questionsN: "questions", attempts: "attempts", readTime: "reading + practice", chOf: "Chapter {0}", openSidebar: "Menu"
   }
 };
-const L = STR[C.meta.ui_lang] || STR.pl;
+const L = STR[C.meta.ui_lang] || STR.en;
 const t = (k, ...a) => { let s = L[k] != null ? L[k] : (STR.en[k] != null ? STR.en[k] : k); a.forEach((v, i) => { s = s.split("{" + i + "}").join(v); }); return s; };
 
 /* ───────────── tiny DOM helpers ───────────── */
