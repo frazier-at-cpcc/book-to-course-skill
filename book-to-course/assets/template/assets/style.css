@@ -76,7 +76,8 @@ h1 { font-size: clamp(1.7rem, 3.4vw, 2.3rem); margin-top: 0; letter-spacing: -.0
 
 /* Math */
 math { line-height: 1.2; }
-.mathblock { overflow-x: auto; margin: 1rem 0; }
+/* overflow-x alone makes overflow-y compute to auto, and tall formulas (roots, fractions) overflow by a few px */
+.mathblock { overflow-x: auto; overflow-y: hidden; padding: .3em 0; margin: 1rem 0; }
 .math-err { font-family: var(--mono); color: var(--bad); border-bottom: 1px dotted var(--bad); cursor: help; }
 
 /* Scroll reveal */
