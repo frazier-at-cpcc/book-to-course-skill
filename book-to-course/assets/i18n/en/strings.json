@@ -105,5 +105,10 @@
   "callout_warning": "Careful",
   "callout_analogy": "Analogy",
   "callout_key": "Remember",
-  "callout_example": "Example"
+  "callout_example": "Example",
+  "derivation": "Derivation",
+  "why": "Why",
+  "result": "Result",
+  "showAll": "Show all",
+  "hideAll": "Hide all"
 }
