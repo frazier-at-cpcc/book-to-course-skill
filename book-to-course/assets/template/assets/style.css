@@ -219,7 +219,8 @@ th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--bo
 /* Responsive */
 @media (max-width: 900px) {
   .shell { display: block; } #menuBtn { display: inline-block; }
-  .sidebar { position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: min(88vw, 340px); height: auto; z-index: 40; transform: translateX(-102%); transition: transform .28s ease; box-shadow: var(--shadow); }
+  /* align-self: auto undoes the desktop "start": newer Chrome applies it to fixed boxes, so the drawer grows to its content and cannot scroll */
+  .sidebar { position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: min(88vw, 340px); height: auto; align-self: auto; overscroll-behavior: contain; z-index: 40; transform: translateX(-102%); transition: transform .28s ease; box-shadow: var(--shadow); }
   body.nav-open .sidebar { transform: none; } body.nav-open .scrim { display: block; position: fixed; inset: var(--topbar-h) 0 0 0; background: rgba(10,12,30,.45); z-index: 35; }
   .save-state { display: none; } .opts, .fill-in, .order-list, .q-actions, .q-feedback, .hints { margin-left: 0; } body { font-size: 16px; }
 }
