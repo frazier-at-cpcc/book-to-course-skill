@@ -27,6 +27,10 @@ BLOCK_REQ = {
 CALLOUTS = {"tip", "note", "warning", "analogy", "key", "example"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 EX_MINUTES = {"easy": 8, "medium": 15, "hard": 25}
+MATH_SPAN = re.compile(r"\$\$.+?\$\$|(?<!\\)\$\S.*?(?<!\\)\$", re.S)
+LATEX_ENV_RE = re.compile(r"\\(begin|end)\{([A-Za-z]+)\}")
+LATEX_CMD_RE = re.compile(r"\\([A-Za-z]+)")
+CTRL_CHARS = (("\x08", "b"), ("\x0c", "f"), ("\x09", "t"))
 
 
 class Report:
@@ -41,7 +45,88 @@ class Report:
 
 
 def wc(s):
-    return len(re.findall(r"\w+", s or "", re.UNICODE))
+    # a $formula$ counts as one word — LaTeX source (\frac{a}{b} = 3 "words") would
+    # otherwise skew the 220-word warning and the theory-minutes estimate
+    return len(re.findall(r"\w+", MATH_SPAN.sub(" formula ", s or ""), re.UNICODE))
+
+
+def load_math_cmds(root):
+    """Read assets/app.js's MATH-CMDS span so the lint allowlist can never drift from the renderer."""
+    try:
+        with open(os.path.join(root, "assets", "app.js"), encoding="utf-8") as f:
+            app_js = f.read()
+    except OSError:
+        return None
+    m = re.search(r"/\* MATH-CMDS-START \*/(.*?)/\* MATH-CMDS-END \*/", app_js, re.S)
+    if not m:
+        return None
+    names = set()
+    for lit in re.findall(r'"([^"]*)"', m.group(1)):
+        names.update(lit.split())
+    return names
+
+
+def _lint_formula(rep, body, where, cmds):
+    if cmds is None:
+        return
+    depth = 0
+    for ch in body:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth < 0:
+                rep.err(where, "formula has an extra '}' — braces are unbalanced")
+                return
+    if depth != 0:
+        rep.err(where, "formula has %d unclosed '{'" % depth)
+    left, right = body.count("\\left"), body.count("\\right")
+    if left != right:
+        rep.err(where, "\\left and \\right are unbalanced (%d \\left, %d \\right)" % (left, right))
+    envs = LATEX_ENV_RE.findall(body)
+    stack = []
+    for kind, name in envs:
+        if kind == "begin":
+            stack.append(name)
+        elif not stack or stack.pop() != name:
+            rep.err(where, "\\end{%s} does not match the corresponding \\begin" % name)
+            return
+    if stack:
+        rep.err(where, "\\begin{%s} has no matching \\end" % stack[-1])
+    names = set(m.group(1) for m in LATEX_CMD_RE.finditer(body)) | set(n for _, n in envs)
+    unknown = sorted(names - cmds - {"limits", "nolimits"})
+    if unknown:
+        rep.err(where, "unsupported LaTeX command(s) \\%s — see references/math.md for the supported subset" % ", \\".join(unknown))
+
+
+def lint_latex(rep, src, where, bare=False):
+    if not src:
+        return
+    for ch, name in CTRL_CHARS:
+        if ch in src:
+            rep.err(where, "contains a literal \\%s control character — write it as \\\\%s in the JSON string" % (name, name))
+    if bare:
+        _lint_formula(rep, src, where, rep.math_cmds)
+        return
+    if len(re.findall(r"(?<!\\)\$", src)) % 2:
+        rep.err(where, "odd number of '$' — unbalanced math delimiter (escape a literal dollar sign as \\$)")
+    for m in MATH_SPAN.finditer(src):
+        _lint_formula(rep, m.group(0).strip("$"), where, rep.math_cmds)
+    for m in re.finditer(r"(?<!\\)\$(\d[\d.,]*)\s", src):
+        rep.warn(where, "'$%s' looks like a currency amount, not math — escape it as \\$ if that's intended" % m.group(1))
+
+
+def check_text(b, where, rep):
+    def walk(x):
+        if isinstance(x, str):
+            lint_latex(rep, x, where)
+        elif isinstance(x, dict):
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    walk(b)
 
 
 def load_json(path, rep):
@@ -190,6 +275,7 @@ def check_block(b, where, lesson, ids, rep, counters):
         if b.get(k) in (None, "", []):
             rep.err(where, "%s block needs `%s`" % (t, k))
             return
+    check_text(b, where, rep)
     if t in ("quiz", "exercise", "flashcards"):
         counters[t] = counters.get(t, 0) + 1
         if not b.get("id"):
@@ -263,6 +349,7 @@ def main():
     root = os.path.abspath(a.course_dir)
     rep = Report()
     rep.root = root
+    rep.math_cmds = load_math_cmds(root)
     content = os.path.join(root, "content")
     meta = load_json(os.path.join(content, "course.json"), rep) or {}
     for k in ("id", "title"):
@@ -337,8 +424,9 @@ def main():
                     rep.err(where, "each term needs `term` and `def`")
             try:
                 t_min, p_min = lesson_minutes(les)
-            except (KeyError, TypeError, AttributeError):
+            except (KeyError, TypeError, AttributeError) as e:
                 t_min, p_min = 0.0, 0.0
+                rep.warn(where, "could not estimate minutes (%s) — minutes will show as 0" % e)
             les.setdefault("minutes", max(5, int(round((t_min + p_min) / 5.0)) * 5))
             th += t_min
             pr += p_min
