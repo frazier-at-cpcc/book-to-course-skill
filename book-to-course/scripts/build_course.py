@@ -27,10 +27,18 @@ BLOCK_REQ = {
 CALLOUTS = {"tip", "note", "warning", "analogy", "key", "example"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 EX_MINUTES = {"easy": 8, "medium": 15, "hard": 25}
-MATH_SPAN = re.compile(r"\$\$.+?\$\$|(?<!\\)\$\S.*?(?<!\\)\$", re.S)
+MATH_SPAN = re.compile(r"\$\$.+?\$\$|(?<!\\)\$\S.*?(?<!\\)\$(?!\d)", re.S)
 LATEX_ENV_RE = re.compile(r"\\(begin|end)\{([A-Za-z]+)\}")
 LATEX_CMD_RE = re.compile(r"\\([A-Za-z]+)")
 CTRL_CHARS = (("\x08", "b"), ("\x0c", "f"), ("\x09", "t"))
+BACKTICK_SPAN = re.compile(r"`[^`]+`")
+# fields that hold code, raw values or bookkeeping, never author-facing prose/markdown —
+# skipped when linting LaTeX so e.g. a bash `$HOME` or a gofmt tab isn't read as broken math
+NON_PROSE_KEYS = {
+    "code", "output", "solution", "input", "command", "command_display", "lang", "language",
+    "id", "type", "file", "exercise_dir", "kind", "difficulty", "answer", "placeholder",
+    "pages", "sections", "chapter", "svg", "highlight",
+}
 
 
 class Report:
@@ -102,32 +110,37 @@ def _lint_formula(rep, body, where, cmds):
 def lint_latex(rep, src, where, bare=False):
     if not src:
         return
+    # backtick code wins over math in inline() too, so `$HOME` or `` `$x` `` must not be
+    # read as a dollar/formula here — the control-char check must also skip code's own tabs
+    body = src if bare else BACKTICK_SPAN.sub(" ", src)
     for ch, name in CTRL_CHARS:
-        if ch in src:
+        if ch in body:
             rep.err(where, "contains a literal \\%s control character — write it as \\\\%s in the JSON string" % (name, name))
     if bare:
-        _lint_formula(rep, src, where, rep.math_cmds)
+        _lint_formula(rep, body, where, rep.math_cmds)
         return
-    if len(re.findall(r"(?<!\\)\$", src)) % 2:
+    if len(re.findall(r"(?<!\\)\$", body)) % 2:
         rep.err(where, "odd number of '$' — unbalanced math delimiter (escape a literal dollar sign as \\$)")
-    for m in MATH_SPAN.finditer(src):
+    for m in MATH_SPAN.finditer(body):
         _lint_formula(rep, m.group(0).strip("$"), where, rep.math_cmds)
     # currency check only outside already-matched math spans, or "$3 \cdot x$" would self-flag
-    outside_math = MATH_SPAN.sub(" ", src)
+    outside_math = MATH_SPAN.sub(" ", body)
     for m in re.finditer(r"(?<!\\)\$(\d[\d.,]*)\s", outside_math):
         rep.warn(where, "'$%s' looks like a currency amount, not math — escape it as \\$ if that's intended" % m.group(1))
 
 
 def check_text(b, where, rep):
-    def walk(x):
+    """Lint LaTeX in prose/markdown fields only — never in code, output, or bookkeeping fields."""
+    def walk(x, key=None):
         if isinstance(x, str):
-            lint_latex(rep, x, where)
+            if key not in NON_PROSE_KEYS:
+                lint_latex(rep, x, where)
         elif isinstance(x, dict):
-            for v in x.values():
-                walk(v)
+            for k, v in x.items():
+                walk(v, k)
         elif isinstance(x, list):
             for v in x:
-                walk(v)
+                walk(v, key)
     walk(b)
 
 

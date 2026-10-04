@@ -409,7 +409,7 @@ function inline(s) {
   const codes = [], maths = [];
   s = String(s).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
   s = s.replace(/\\\$/g, () => "\u0002");
-  s = s.replace(/\$\$([^\n]+?)\$\$|\$(?=\S)([^$\n]*[^\s$])\$/g, (m, disp, inl) => {
+  s = s.replace(/\$\$([^\n]+?)\$\$|\$(?=\S)([^$\n]*[^\s$])\$(?!\d)/g, (m, disp, inl) => {
     const body = disp != null ? disp : inl; maths.push(tex2mml(body, disp != null));
     return "\u0001" + (maths.length - 1) + "\u0001";
   });
