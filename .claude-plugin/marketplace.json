@@ -1,0 +1,27 @@
+{
+  "name": "book-to-course",
+  "owner": {
+    "name": "Sebastian Haba",
+    "url": "https://github.com/sebastianhaba"
+  },
+  "metadata": {
+    "description": "Marketplace for the book-to-course skill — turn books into interactive courses.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "book-to-course",
+      "source": "./",
+      "description": "Turn a book or document (EPUB, PDF, HTML, DOCX, Markdown, TXT) into an interactive, beginner-friendly course delivered as a local web page.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Sebastian Haba"
+      },
+      "homepage": "https://github.com/sebastianhaba/book-to-course-skill",
+      "repository": "https://github.com/sebastianhaba/book-to-course-skill",
+      "license": "MIT",
+      "category": "education",
+      "keywords": ["course", "learning", "education", "book", "quiz"]
+    }
+  ]
+}

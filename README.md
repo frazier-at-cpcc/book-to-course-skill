@@ -36,3 +36,7 @@ These screenshots show a course generated from a Go programming book:
 Starting the course this way requires Python 3. Programming exercises also require the relevant language and test tools, such as Go for a Go course. You can open `index.html` directly without the server; quizzes and lessons still work, while progress stays in the browser and code tests must be run in a terminal.
 
 The skill and its supporting scripts, templates, and references are in [`book-to-course/`](book-to-course/SKILL.md). Generated courses are self-contained folders that can be packaged and shared.
+
+## License
+
+Released under the [MIT License](LICENSE).
