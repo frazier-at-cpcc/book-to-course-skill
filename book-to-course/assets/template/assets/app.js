@@ -96,7 +96,7 @@ const MATH_CMD_NAMES = (
   "to rightarrow leftarrow leftrightarrow Rightarrow Leftarrow Leftrightarrow implies iff mapsto " +
   "in notin ni subset subseteq supset supseteq cup cap setminus emptyset varnothing forall exists nexists neg lnot land wedge lor vee mid colon " +
   "ldots cdots vdots ddots dots langle rangle lfloor rfloor lceil rceil vert Vert lvert rvert lVert rVert " +
-  "sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp deg gcd dim ker Pr " +
+  "sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp deg gcd dim ker Pr det " +
   "sum prod coprod int iint iiint oint bigcup bigcap bigoplus lim limsup liminf max min sup inf limits nolimits " +
   "hat widehat bar overline vec tilde widetilde dot ddot overbrace underbrace overrightarrow underline " +
   "mathbb mathcal mathfrak mathbf mathit mathsf mathtt mathrm boldsymbol " +
@@ -126,7 +126,7 @@ const SYM = {
   langle: "⟨", rangle: "⟩", lfloor: "⌊", rfloor: "⌋", lceil: "⌈", rceil: "⌉",
   vert: "|", Vert: "‖", lvert: "|", rvert: "|", lVert: "‖", rVert: "‖"
 };
-const FUNCS = {}; "sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp deg gcd dim ker Pr".split(" ").forEach(w => { FUNCS[w] = 1; });
+const FUNCS = {}; "sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp deg gcd dim ker Pr det".split(" ").forEach(w => { FUNCS[w] = 1; });
 const BIGOPS = {
   sum: { sym: "∑", limits: true }, prod: { sym: "∏", limits: true }, coprod: { sym: "∐", limits: true },
   int: { sym: "∫", limits: false }, iint: { sym: "∬", limits: false }, iiint: { sym: "∭", limits: false }, oint: { sym: "∮", limits: false },

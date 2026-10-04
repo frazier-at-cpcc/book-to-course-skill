@@ -112,7 +112,9 @@ def lint_latex(rep, src, where, bare=False):
         rep.err(where, "odd number of '$' — unbalanced math delimiter (escape a literal dollar sign as \\$)")
     for m in MATH_SPAN.finditer(src):
         _lint_formula(rep, m.group(0).strip("$"), where, rep.math_cmds)
-    for m in re.finditer(r"(?<!\\)\$(\d[\d.,]*)\s", src):
+    # currency check only outside already-matched math spans, or "$3 \cdot x$" would self-flag
+    outside_math = MATH_SPAN.sub(" ", src)
+    for m in re.finditer(r"(?<!\\)\$(\d[\d.,]*)\s", outside_math):
         rep.warn(where, "'$%s' looks like a currency amount, not math — escape it as \\$ if that's intended" % m.group(1))
 
 
