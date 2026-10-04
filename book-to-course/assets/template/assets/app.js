@@ -32,13 +32,342 @@ function add(el, ...kids) { kids.flat(Infinity).forEach(k => { if (k != null && 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/* ───────────── LaTeX → MathML translator ─────────────
+   A small, dependency-free subset: algebra, functions, big operators, matrices/cases,
+   sets/logic, Greek letters, common fonts and spacing. Unknown input never throws past
+   tex2mml() — it falls back to the raw source so a broken formula never blanks the page.
+   Command names below are also the lint allowlist read by scripts/build_course.py — keep
+   the two in sync by only adding names inside the MATH-CMDS-START/END string literals. */
+/* MATH-CMDS-START */
+const MATH_CMD_NAMES = (
+  "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi pi rho sigma tau upsilon phi chi psi omega " +
+  "varepsilon vartheta varpi varrho varsigma varphi Gamma Delta Theta Lambda Xi Pi Sigma Upsilon Phi Psi Omega " +
+  "cdot times div pm mp ast circ ne neq le leq ge geq ll gg approx equiv sim simeq cong propto infty partial nabla degree " +
+  "to rightarrow leftarrow leftrightarrow Rightarrow Leftarrow Leftrightarrow implies iff mapsto " +
+  "in notin ni subset subseteq supset supseteq cup cap setminus emptyset varnothing forall exists nexists neg lnot land wedge lor vee mid colon " +
+  "ldots cdots vdots ddots dots langle rangle lfloor rfloor lceil rceil vert Vert lvert rvert lVert rVert " +
+  "sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp deg gcd dim ker Pr det " +
+  "sum prod coprod int iint iiint oint bigcup bigcap bigoplus lim limsup liminf max min sup inf limits nolimits " +
+  "hat widehat bar overline vec tilde widetilde dot ddot overbrace underbrace overrightarrow underline " +
+  "mathbb mathcal mathfrak mathbf mathit mathsf mathtt mathrm boldsymbol " +
+  "frac dfrac tfrac binom sqrt left right begin end text textrm textbf textit operatorname quad qquad phantom pmod bmod " +
+  "matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix cases aligned array"
+).split(" ");
+/* MATH-CMDS-END */
+
+const GREEK = {
+  alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", zeta: "ζ", eta: "η", theta: "θ", iota: "ι",
+  kappa: "κ", lambda: "λ", mu: "μ", nu: "ν", xi: "ξ", pi: "π", rho: "ρ", sigma: "σ", tau: "τ", upsilon: "υ",
+  phi: "φ", chi: "χ", psi: "ψ", omega: "ω",
+  varepsilon: "ϵ", vartheta: "ϑ", varpi: "ϖ", varrho: "ϱ", varsigma: "ς", varphi: "ϕ",
+  Gamma: "Γ", Delta: "Δ", Theta: "Θ", Lambda: "Λ", Xi: "Ξ", Pi: "Π", Sigma: "Σ", Upsilon: "Υ", Phi: "Φ", Psi: "Ψ", Omega: "Ω"
+};
+const SYM = {
+  cdot: "·", times: "×", div: "÷", pm: "±", mp: "∓", ast: "∗", circ: "∘",
+  ne: "≠", neq: "≠", le: "≤", leq: "≤", ge: "≥", geq: "≥", ll: "≪", gg: "≫",
+  approx: "≈", equiv: "≡", sim: "∼", simeq: "≃", cong: "≅", propto: "∝",
+  infty: "∞", partial: "∂", nabla: "∇", degree: "°",
+  to: "→", rightarrow: "→", leftarrow: "←", leftrightarrow: "↔",
+  Rightarrow: "⇒", Leftarrow: "⇐", Leftrightarrow: "⇔", implies: "⇒", iff: "⇔", mapsto: "↦",
+  in: "∈", notin: "∉", ni: "∋", subset: "⊂", subseteq: "⊆", supset: "⊃", supseteq: "⊇",
+  cup: "∪", cap: "∩", setminus: "∖", emptyset: "∅", varnothing: "∅",
+  forall: "∀", exists: "∃", nexists: "∄", neg: "¬", lnot: "¬", land: "∧", wedge: "∧", lor: "∨", vee: "∨",
+  mid: "∣", colon: ":", ldots: "…", cdots: "⋯", vdots: "⋮", ddots: "⋱", dots: "…",
+  langle: "⟨", rangle: "⟩", lfloor: "⌊", rfloor: "⌋", lceil: "⌈", rceil: "⌉",
+  vert: "|", Vert: "‖", lvert: "|", rvert: "|", lVert: "‖", rVert: "‖"
+};
+const FUNCS = {}; "sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp deg gcd dim ker Pr det".split(" ").forEach(w => { FUNCS[w] = 1; });
+const BIGOPS = {
+  sum: { sym: "∑", limits: true }, prod: { sym: "∏", limits: true }, coprod: { sym: "∐", limits: true },
+  int: { sym: "∫", limits: false }, iint: { sym: "∬", limits: false }, iiint: { sym: "∭", limits: false }, oint: { sym: "∮", limits: false },
+  bigcup: { sym: "⋃", limits: true }, bigcap: { sym: "⋂", limits: true }, bigoplus: { sym: "⊕", limits: true },
+  lim: { text: true, limits: true }, limsup: { text: true, limits: true }, liminf: { text: true, limits: true },
+  max: { text: true, limits: true }, min: { text: true, limits: true }, sup: { text: true, limits: true }, inf: { text: true, limits: true }
+};
+const ACCENT_OVER = { hat: "^", widehat: "^", bar: "‾", overline: "‾", vec: "→", tilde: "~", widetilde: "~", dot: "˙", ddot: "¨", overbrace: "⏞", overrightarrow: "→" };
+const ACCENT_UNDER = { underline: "_", underbrace: "⏟" };
+const FONT_CMDS = {}; "mathbb mathcal mathfrak mathbf mathit mathsf mathtt mathrm boldsymbol".split(" ").forEach(w => { FONT_CMDS[w] = 1; });
+const SPACE_EM = { ",": 0.1667, ":": 0.2222, ";": 0.2778, "!": -0.1667, " ": 0.25 };
+const DELIMS = {
+  "(": "(", ")": ")", "[": "[", "]": "]", "|": "|", ".": "",
+  "\\{": "{", "\\}": "}", "\\|": "‖", "\\langle": "⟨", "\\rangle": "⟩",
+  "\\lfloor": "⌊", "\\rfloor": "⌋", "\\lceil": "⌈", "\\rceil": "⌉"
+};
+const ENVS = {
+  matrix: { delim: null }, pmatrix: { delim: ["(", ")"] }, bmatrix: { delim: ["[", "]"] },
+  Bmatrix: { delim: ["\\{", "\\}"] }, vmatrix: { delim: ["|", "|"] }, Vmatrix: { delim: ["‖", "‖"] },
+  cases: { delim: ["\\{", null], align: "left" }, aligned: { delim: null, align: "right left" }, array: { delim: null }
+};
+const CODEPOINT_FONTS = {
+  mathbb: { upper: 0x1D538, lower: 0x1D552, digit: 0x1D7D8, exceptions: { C: "ℂ", H: "ℍ", N: "ℕ", P: "ℙ", Q: "ℚ", R: "ℝ", Z: "ℤ" } },
+  mathcal: { upper: 0x1D49C, lower: 0x1D4B6, digit: null, exceptions: { B: "ℬ", E: "ℰ", F: "ℱ", H: "ℋ", I: "ℐ", L: "ℒ", M: "ℳ", R: "ℛ", e: "ℯ", g: "ℊ", o: "ℴ" } },
+  mathfrak: { upper: 0x1D504, lower: 0x1D51E, digit: null, exceptions: { C: "ℭ", H: "ℌ", I: "ℑ", R: "ℜ", Z: "ℨ" } }
+};
+function mapMathLetter(ch, font) {
+  const def = CODEPOINT_FONTS[font];
+  if (def.exceptions[ch]) return def.exceptions[ch];
+  if (/[A-Z]/.test(ch)) return String.fromCodePoint(def.upper + (ch.charCodeAt(0) - 65));
+  if (/[a-z]/.test(ch)) return String.fromCodePoint(def.lower + (ch.charCodeAt(0) - 97));
+  if (/[0-9]/.test(ch) && def.digit != null) return String.fromCodePoint(def.digit + (ch.charCodeAt(0) - 48));
+  return ch;
+}
+
+function mathTokenize(src) {
+  const re = /\\\\|\\[A-Za-z]+|\\[,:;!\s{}|%$&#_^~]|[{}^_&]|\d+(?:\.\d+)?|[A-Za-z]|\s+|./gs;
+  const toks = []; let m;
+  while ((m = re.exec(src))) {
+    const v = m[0];
+    if (/^\s+$/.test(v)) continue;
+    let k;
+    if (v === "\\\\") k = "rowbreak";
+    else if (v[0] === "\\" && v.length > 1 && /[A-Za-z]/.test(v[1])) k = "cmd";
+    else if (v[0] === "\\") k = "esc";
+    else if (v === "{" || v === "}") k = "brace";
+    else if (v === "^" || v === "_") k = "script";
+    else if (v === "&") k = "amp";
+    else if (/^\d/.test(v)) k = "num";
+    else if (/^[A-Za-z]$/.test(v)) k = "ident";
+    else k = "op";
+    toks.push({ k, v, pos: m.index });
+  }
+  return toks;
+}
+
+function mathParse(src) {
+  const tokens = mathTokenize(src);
+  let i = 0;
+  const peek = () => tokens[i];
+  const atEnd = () => i >= tokens.length;
+  const next = () => tokens[i++];
+  function fail(msg) { throw { mathErr: true, message: msg }; }
+
+  function wrapRow(parts) { return parts.length === 1 ? parts[0].mml : "<mrow>" + parts.map(p => p.mml).join("") + "</mrow>"; }
+
+  function parseScripted() {
+    const base = parseAtom();
+    let limits = !!base.limits;
+    if (!atEnd() && peek().k === "cmd" && (peek().v === "\\limits" || peek().v === "\\nolimits")) limits = next().v === "\\limits";
+    let sub = null, sup = null;
+    while (!atEnd() && peek().k === "script") {
+      const s = next(); const val = parseArg();
+      if (s.v === "_") { if (sub) fail("double subscript"); sub = val; }
+      else { if (sup) fail("double superscript"); sup = val; }
+    }
+    if (!sub && !sup) return base;
+    const tag = limits ? (sub && sup ? "munderover" : sub ? "munder" : "mover") : (sub && sup ? "msubsup" : sub ? "msub" : "msup");
+    const kids = [base.mml]; if (sub) kids.push(sub.mml); if (sup) kids.push(sup.mml);
+    return { mml: "<" + tag + ">" + kids.join("") + "</" + tag + ">" };
+  }
+
+  function parseGroupInner() {
+    next();
+    const parts = [];
+    while (!atEnd() && !(peek().k === "brace" && peek().v === "}")) parts.push(parseScripted());
+    if (atEnd()) fail("unbalanced { }");
+    next();
+    return wrapRow(parts.length ? parts : [{ mml: "" }]);
+  }
+
+  function parseArg() {
+    if (atEnd()) fail("expected an argument");
+    if (peek().k === "brace" && peek().v === "{") return { mml: parseGroupInner() };
+    return parseAtom();
+  }
+
+  function optArg() {
+    if (!atEnd() && peek().k === "op" && peek().v === "[") {
+      next(); const parts = [];
+      while (!atEnd() && !(peek().k === "op" && peek().v === "]")) parts.push(parseScripted());
+      if (atEnd()) fail("unbalanced [ ]");
+      next();
+      return wrapRow(parts.length ? parts : [{ mml: "" }]);
+    }
+    return null;
+  }
+
+  function readRawArg() {
+    if (atEnd()) fail("expected an argument");
+    if (peek().k === "brace" && peek().v === "{") {
+      const open = next(); let depth = 1, endPos = null;
+      while (!atEnd() && depth > 0) {
+        const tk = next();
+        if (tk.k === "brace" && tk.v === "{") depth++;
+        else if (tk.k === "brace" && tk.v === "}") { depth--; if (depth === 0) endPos = tk.pos; }
+      }
+      if (endPos == null) fail("unbalanced { }");
+      return src.slice(open.pos + 1, endPos);
+    }
+    return next().v;
+  }
+
+  function readDelim() {
+    if (atEnd()) fail("expected a delimiter after \\left or \\right");
+    const tok = next();
+    if (!(tok.v in DELIMS)) fail("'" + tok.v + "' is not a valid \\left/\\right delimiter");
+    return DELIMS[tok.v];
+  }
+
+  function decorate(tag, ch) {
+    const a = parseArg();
+    return { mml: "<" + tag + ' accent="true">' + a.mml + '<mo stretchy="true">' + esc(ch) + "</mo></" + tag + ">" };
+  }
+
+  function fracAtom(name) {
+    const num = parseArg(), den = parseArg();
+    const disp = name === "dfrac" ? ' displaystyle="true"' : name === "tfrac" ? ' displaystyle="false"' : "";
+    return { mml: "<mfrac" + disp + ">" + num.mml + den.mml + "</mfrac>" };
+  }
+  function binomAtom() {
+    const n = parseArg(), k = parseArg();
+    return { mml: '<mrow><mo stretchy="true">(</mo><mfrac linethickness="0">' + n.mml + k.mml + '</mfrac><mo stretchy="true">)</mo></mrow>' };
+  }
+  function sqrtAtom() {
+    const idx = optArg(); const a = parseArg();
+    return idx ? { mml: "<mroot>" + a.mml + idx + "</mroot>" } : { mml: "<msqrt>" + a.mml + "</msqrt>" };
+  }
+  function leftAtom() {
+    const open = readDelim(); const parts = [];
+    while (!atEnd() && !(peek().k === "cmd" && peek().v === "\\right")) parts.push(parseScripted());
+    if (atEnd()) fail("\\left without a matching \\right");
+    next(); const close = readDelim();
+    const o = open ? '<mo stretchy="true" fence="true">' + esc(open) + "</mo>" : "";
+    const c = close ? '<mo stretchy="true" fence="true">' + esc(close) + "</mo>" : "";
+    return { mml: "<mrow>" + o + wrapRow(parts.length ? parts : [{ mml: "" }]) + c + "</mrow>" };
+  }
+  function readEnvName() {
+    if (atEnd() || !(peek().k === "brace" && peek().v === "{")) fail("expected { after \\begin or \\end");
+    return readRawArg();
+  }
+  function envAtom() {
+    const name = readEnvName();
+    if (!(name in ENVS)) fail("unknown environment '" + name + "'");
+    const def = ENVS[name];
+    const rows = [[[]]];
+    for (;;) {
+      if (atEnd()) fail("\\begin{" + name + "} without a matching \\end");
+      const p = peek();
+      if (p.k === "cmd" && p.v === "\\end") {
+        next(); const en = readEnvName();
+        if (en !== name) fail("\\begin{" + name + "} closed by \\end{" + en + "}");
+        break;
+      }
+      if (p.k === "rowbreak") { next(); rows.push([[]]); continue; }
+      if (p.k === "amp") { next(); rows[rows.length - 1].push([]); continue; }
+      rows[rows.length - 1][rows[rows.length - 1].length - 1].push(parseScripted());
+    }
+    const aligns = (def.align || "center").split(" ");
+    const trs = rows.filter(r => r.length > 1 || r[0].length > 0)
+      .map(cells => "<mtr>" + cells.map((parts, ci) => '<mtd columnalign="' + aligns[Math.min(ci, aligns.length - 1)] + '">' + wrapRow(parts.length ? parts : [{ mml: "" }]) + "</mtd>").join("") + "</mtr>")
+      .join("");
+    let mml = "<mtable>" + trs + "</mtable>";
+    if (def.delim) {
+      const [o, c] = def.delim;
+      const om = o ? '<mo stretchy="true" fence="true">' + esc(DELIMS[o] != null ? DELIMS[o] : o) + "</mo>" : "";
+      const cm = c ? '<mo stretchy="true" fence="true">' + esc(DELIMS[c] != null ? DELIMS[c] : c) + "</mo>" : "";
+      mml = "<mrow>" + om + mml + cm + "</mrow>";
+    }
+    return { mml };
+  }
+  function textAtom(style) {
+    const raw = readRawArg();
+    const sty = style === "bold" ? ' style="font-weight:bold"' : style === "italic" ? ' style="font-style:italic"' : "";
+    return { mml: "<mtext" + sty + ">" + esc(raw) + "</mtext>" };
+  }
+  function operatornameAtom() { return { mml: "<mi>" + esc(readRawArg()) + "</mi>" }; }
+  function pmodAtom() {
+    const a = parseArg();
+    return { mml: '<mrow><mspace width="0.3em"></mspace><mo>(</mo><mi>mod</mi><mspace width="0.3em"></mspace>' + a.mml + "<mo>)</mo></mrow>" };
+  }
+  function fontAtom(name) {
+    const raw = readRawArg();
+    if (name === "mathbb" || name === "mathcal" || name === "mathfrak") {
+      const mapped = [...raw].map(ch => /[A-Za-z0-9]/.test(ch) ? mapMathLetter(ch, name) : ch).join("");
+      return { mml: "<mi>" + esc(mapped) + "</mi>" };
+    }
+    if (name === "mathrm") return { mml: '<mi mathvariant="normal">' + esc(raw) + "</mi>" };
+    const sty = name === "mathbf" || name === "boldsymbol" ? "font-weight:bold" : name === "mathit" ? "font-style:italic" : name === "mathsf" ? "font-family:sans-serif" : name === "mathtt" ? "font-family:monospace" : "";
+    return { mml: '<mi style="' + sty + '">' + esc(raw) + "</mi>" };
+  }
+
+  function cmdAtom(name) {
+    if (name in GREEK) return { mml: "<mi>" + GREEK[name] + "</mi>" };
+    if (name in SYM) return { mml: "<mo>" + SYM[name] + "</mo>" };
+    if (name in FUNCS) return { mml: "<mi>" + name + "</mi>" };
+    if (name in BIGOPS) { const o = BIGOPS[name]; return { mml: o.text ? "<mi>" + name + "</mi>" : "<mo>" + o.sym + "</mo>", limits: o.limits }; }
+    if (name in ACCENT_OVER) return decorate("mover", ACCENT_OVER[name]);
+    if (name in ACCENT_UNDER) return decorate("munder", ACCENT_UNDER[name]);
+    if (name in FONT_CMDS) return fontAtom(name);
+    switch (name) {
+      case "frac": case "dfrac": case "tfrac": return fracAtom(name);
+      case "binom": return binomAtom();
+      case "sqrt": return sqrtAtom();
+      case "left": return leftAtom();
+      case "right": fail("\\right without a matching \\left"); break;
+      case "begin": return envAtom();
+      case "end": fail("\\end without a matching \\begin"); break;
+      case "text": case "textrm": return textAtom();
+      case "textbf": return textAtom("bold");
+      case "textit": return textAtom("italic");
+      case "operatorname": return operatornameAtom();
+      case "quad": return { mml: '<mspace width="1em"></mspace>' };
+      case "qquad": return { mml: '<mspace width="2em"></mspace>' };
+      case "phantom": parseArg(); return { mml: "<mspace></mspace>" };
+      case "pmod": return pmodAtom();
+      case "bmod": return { mml: '<mo lspace="0.3em" rspace="0.3em">mod</mo>' };
+      default: fail("unknown command \\" + name);
+    }
+  }
+
+  function opAtom(ch) { return { mml: ch === "'" ? "<mo>′</mo>" : "<mo>" + esc(ch) + "</mo>" }; }
+  function escAtom(ch) {
+    if (ch in SPACE_EM) return { mml: '<mspace width="' + SPACE_EM[ch] + 'em"></mspace>' };
+    if (ch === "~") return { mml: '<mspace width="0.25em"></mspace>' };
+    return { mml: "<mo>" + esc(ch) + "</mo>" };
+  }
+  function parseAtom() {
+    if (atEnd()) fail("unexpected end of formula");
+    const tok = peek();
+    if (tok.k === "brace" && tok.v === "{") return { mml: parseGroupInner() };
+    if (tok.k === "brace") fail("unexpected }");
+    if (tok.k === "num") { next(); return { mml: "<mn>" + esc(tok.v) + "</mn>" }; }
+    if (tok.k === "ident") { next(); return { mml: "<mi>" + esc(tok.v) + "</mi>" }; }
+    if (tok.k === "amp" || tok.k === "rowbreak") fail("unexpected '" + tok.v + "' outside a matrix/cases environment");
+    if (tok.k === "op") { next(); return opAtom(tok.v); }
+    if (tok.k === "esc") { next(); return escAtom(tok.v.slice(1)); }
+    if (tok.k === "cmd") { next(); return cmdAtom(tok.v.slice(1)); }
+    fail("unexpected token '" + tok.v + "'");
+  }
+
+  const parts = [];
+  while (!atEnd()) parts.push(parseScripted());
+  return wrapRow(parts.length ? parts : [{ mml: "" }]);
+}
+
+function tex2mml(src, display) {
+  try {
+    const body = mathParse(String(src == null ? "" : src));
+    return '<math display="' + (display ? "block" : "inline") + '">' + body + "</math>";
+  } catch (e) {
+    const msg = (e && e.mathErr) ? e.message : "math error";
+    const raw = (display ? "$$" : "$") + src + (display ? "$$" : "$");
+    return '<span class="math-err" title="' + esc(msg) + '">' + esc(raw) + "</span>";
+  }
+}
+
 /* ───────────── mini markdown (safe: escapes everything first) ───────────── */
 function inline(s) {
-  const codes = [];
+  const codes = [], maths = [];
   s = String(s).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+  s = s.replace(/\\\$/g, () => "\u0002");
+  s = s.replace(/\$\$([^\n]+?)\$\$|\$(?=\S)([^$\n]*[^\s$])\$(?!\d)/g, (m, disp, inl) => {
+    const body = disp != null ? disp : inl; maths.push(tex2mml(body, disp != null));
+    return "\u0001" + (maths.length - 1) + "\u0001";
+  });
   s = esc(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)/g, "$1<em>$2</em>");
   s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s = s.replace(/\u0001(\d+)\u0001/g, (m, i) => maths[+i]);
+  s = s.replace(/\u0002/g, "$");
   return s.replace(/\u0000(\d+)\u0000/g, (m, i) => "<code>" + esc(codes[+i]) + "</code>");
 }
 function md(src) {
@@ -56,6 +385,18 @@ function md(src) {
       html += '<div class="code-wrap"><pre><code>' + highlightLines(buf.join("\n"), lang).map(x => '<span class="ln">' + x + "</span>").join("") + "</code></pre></div>";
       continue;
     }
+    if (/^\$\$/.test(l)) {
+      let rest = l.replace(/^\$\$/, ""); const buf = [];
+      const closeIdx = rest.indexOf("$$");
+      if (closeIdx >= 0) { buf.push(rest.slice(0, closeIdx)); i++; }
+      else {
+        buf.push(rest); i++;
+        while (i < lines.length && lines[i].indexOf("$$") < 0) buf.push(lines[i++]);
+        if (i < lines.length) { buf.push(lines[i].slice(0, lines[i].indexOf("$$"))); i++; }
+      }
+      html += '<div class="mathblock">' + tex2mml(buf.join("\n"), true) + "</div>";
+      continue;
+    }
     if ((m = /^(#{1,4})\s+(.*)$/.exec(l))) { const n = Math.min(m[1].length + 2, 6); html += "<h" + n + ">" + inline(m[2]) + "</h" + n + ">"; i++; continue; }
     if (/^>\s?/.test(l)) { const buf = []; while (i < lines.length && /^>\s?/.test(lines[i])) buf.push(lines[i++].replace(/^>\s?/, "")); html += "<blockquote>" + inline(buf.join(" ")) + "</blockquote>"; continue; }
     if (isList(l)) {
@@ -65,7 +406,7 @@ function md(src) {
       html += "<" + tag + ">" + items.map(x => "<li>" + inline(x) + "</li>").join("") + "</" + tag + ">"; continue;
     }
     const buf = [];
-    while (i < lines.length && lines[i].trim() && !isList(lines[i]) && !/^#{1,4}\s/.test(lines[i]) && !/^>/.test(lines[i]) && !/^```/.test(lines[i])) buf.push(lines[i++]);
+    while (i < lines.length && lines[i].trim() && !isList(lines[i]) && !/^#{1,4}\s/.test(lines[i]) && !/^>/.test(lines[i]) && !/^```/.test(lines[i]) && !/^\$\$/.test(lines[i])) buf.push(lines[i++]);
     html += "<p>" + inline(buf.join(" ")) + "</p>";
   }
   return html;
@@ -603,6 +944,6 @@ function initChrome() {
 (async function boot() {
   initChrome(); await loadProgress(); setSaveState();
   window.addEventListener("hashchange", route); route();
-  window.__course = { get progress() { return P; }, route, save };
+  window.__course = { get progress() { return P; }, route, save, tex2mml };
 })();
 })();

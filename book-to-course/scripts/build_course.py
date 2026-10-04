@@ -29,6 +29,18 @@ BLOCK_REQ = {
 CALLOUTS = {"tip", "note", "warning", "analogy", "key", "example"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 EX_MINUTES = {"easy": 8, "medium": 15, "hard": 25}
+MATH_SPAN = re.compile(r"\$\$.+?\$\$|(?<!\\)\$\S.*?(?<!\\)\$(?!\d)", re.S)
+LATEX_ENV_RE = re.compile(r"\\(begin|end)\{([A-Za-z]+)\}")
+LATEX_CMD_RE = re.compile(r"\\([A-Za-z]+)")
+CTRL_CHARS = (("\x08", "b"), ("\x0c", "f"), ("\x09", "t"))
+BACKTICK_SPAN = re.compile(r"`[^`]+`")
+# fields that hold code, raw values or bookkeeping, never author-facing prose/markdown —
+# skipped when linting LaTeX so e.g. a bash `$HOME` or a gofmt tab isn't read as broken math
+NON_PROSE_KEYS = {
+    "code", "output", "solution", "input", "command", "command_display", "lang", "language",
+    "id", "type", "file", "exercise_dir", "kind", "difficulty", "answer", "placeholder",
+    "pages", "sections", "chapter", "svg", "highlight",
+}
 
 
 class Report:
@@ -43,7 +55,95 @@ class Report:
 
 
 def wc(s):
-    return len(re.findall(r"\w+", s or "", re.UNICODE))
+    # a $formula$ counts as one word — LaTeX source (\frac{a}{b} = 3 "words") would
+    # otherwise skew the 220-word warning and the theory-minutes estimate
+    return len(re.findall(r"\w+", MATH_SPAN.sub(" formula ", s or ""), re.UNICODE))
+
+
+def load_math_cmds(root):
+    """Read assets/app.js's MATH-CMDS span so the lint allowlist can never drift from the renderer."""
+    try:
+        with open(os.path.join(root, "assets", "app.js"), encoding="utf-8") as f:
+            app_js = f.read()
+    except OSError:
+        return None
+    m = re.search(r"/\* MATH-CMDS-START \*/(.*?)/\* MATH-CMDS-END \*/", app_js, re.S)
+    if not m:
+        return None
+    names = set()
+    for lit in re.findall(r'"([^"]*)"', m.group(1)):
+        names.update(lit.split())
+    return names
+
+
+def _lint_formula(rep, body, where, cmds):
+    if cmds is None:
+        return
+    depth = 0
+    for ch in body:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth < 0:
+                rep.err(where, "formula has an extra '}' — braces are unbalanced")
+                return
+    if depth != 0:
+        rep.err(where, "formula has %d unclosed '{'" % depth)
+    left, right = body.count("\\left"), body.count("\\right")
+    if left != right:
+        rep.err(where, "\\left and \\right are unbalanced (%d \\left, %d \\right)" % (left, right))
+    envs = LATEX_ENV_RE.findall(body)
+    stack = []
+    for kind, name in envs:
+        if kind == "begin":
+            stack.append(name)
+        elif not stack or stack.pop() != name:
+            rep.err(where, "\\end{%s} does not match the corresponding \\begin" % name)
+            return
+    if stack:
+        rep.err(where, "\\begin{%s} has no matching \\end" % stack[-1])
+    names = set(m.group(1) for m in LATEX_CMD_RE.finditer(body)) | set(n for _, n in envs)
+    unknown = sorted(names - cmds - {"limits", "nolimits"})
+    if unknown:
+        rep.err(where, "unsupported LaTeX command(s) \\%s — see references/math.md for the supported subset" % ", \\".join(unknown))
+
+
+def lint_latex(rep, src, where, bare=False):
+    if not src:
+        return
+    # backtick code wins over math in inline() too, so `$HOME` or `` `$x` `` must not be
+    # read as a dollar/formula here — the control-char check must also skip code's own tabs
+    body = src if bare else BACKTICK_SPAN.sub(" ", src)
+    for ch, name in CTRL_CHARS:
+        if ch in body:
+            rep.err(where, "contains a literal \\%s control character — write it as \\\\%s in the JSON string" % (name, name))
+    if bare:
+        _lint_formula(rep, body, where, rep.math_cmds)
+        return
+    if len(re.findall(r"(?<!\\)\$", body)) % 2:
+        rep.err(where, "odd number of '$' — unbalanced math delimiter (escape a literal dollar sign as \\$)")
+    for m in MATH_SPAN.finditer(body):
+        _lint_formula(rep, m.group(0).strip("$"), where, rep.math_cmds)
+    # currency check only outside already-matched math spans, or "$3 \cdot x$" would self-flag
+    outside_math = MATH_SPAN.sub(" ", body)
+    for m in re.finditer(r"(?<!\\)\$(\d[\d.,]*)\s", outside_math):
+        rep.warn(where, "'$%s' looks like a currency amount, not math — escape it as \\$ if that's intended" % m.group(1))
+
+
+def check_text(b, where, rep):
+    """Lint LaTeX in prose/markdown fields only — never in code, output, or bookkeeping fields."""
+    def walk(x, key=None):
+        if isinstance(x, str):
+            if key not in NON_PROSE_KEYS:
+                lint_latex(rep, x, where)
+        elif isinstance(x, dict):
+            for k, v in x.items():
+                walk(v, k)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v, key)
+    walk(b)
 
 
 def load_json(path, rep):
@@ -192,6 +292,7 @@ def check_block(b, where, lesson, ids, rep, counters):
         if b.get(k) in (None, "", []):
             rep.err(where, "%s block needs `%s`" % (t, k))
             return
+    check_text(b, where, rep)
     if t in ("quiz", "exercise", "flashcards"):
         counters[t] = counters.get(t, 0) + 1
         if not b.get("id"):
@@ -265,6 +366,7 @@ def main():
     root = os.path.abspath(a.course_dir)
     rep = Report()
     rep.root = root
+    rep.math_cmds = load_math_cmds(root)
     content = os.path.join(root, "content")
     meta = load_json(os.path.join(content, "course.json"), rep) or {}
     for k in ("id", "title"):
@@ -348,8 +450,9 @@ def main():
                     rep.err(where, "each term needs `term` and `def`")
             try:
                 t_min, p_min = lesson_minutes(les)
-            except (KeyError, TypeError, AttributeError):
+            except (KeyError, TypeError, AttributeError) as e:
                 t_min, p_min = 0.0, 0.0
+                rep.warn(where, "could not estimate minutes (%s) — minutes will show as 0" % e)
             les.setdefault("minutes", max(5, int(round((t_min + p_min) / 5.0)) * 5))
             th += t_min
             pr += p_min
