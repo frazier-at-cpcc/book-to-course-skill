@@ -8,9 +8,11 @@ Standard library only; PDFs use `pdftotext` (poppler) when present, else `pypdf`
 
 --only CHAPTER limits the output to a single chapter — handy to try a course (or a new
 feature) on one chapter before committing to the whole book. CHAPTER may be its 1-based
-number (3), its id once extracted (ch03), or a case-insensitive substring of its title.
-The resulting OUTDIR/manifest.json then has just that one chapter, so init_course.py
-scaffolds a course scoped to it.
+number (3), its id once extracted (ch03), or a case-insensitive substring of its title; a
+number/id always wins over a title match. The resulting OUTDIR/manifest.json then has just
+that one chapter (keeping its real chapter number, e.g. ch05, not renumbered to ch01), so
+init_course.py scaffolds a course scoped to it. Use a fresh OUTDIR, not one that already
+holds a full extraction — like a plain run, --only clears OUTDIR/chapters/*.md first.
 
 Writes:
   OUTDIR/manifest.json         title, author, language, chapters (id, title, file, words, kind, headings)
@@ -662,7 +664,7 @@ def main():
     ap.add_argument("input")
     ap.add_argument("outdir")
     ap.add_argument("--chunk-pages", type=int, default=25, help="PDF without usable outline: pages per part")
-    ap.add_argument("--only", help="limit extraction to one chapter: its number (3), id (ch03), or a substring of its title")
+    ap.add_argument("--only", help="limit extraction to one chapter: its number (3), id (ch03), or a substring of its title — use a fresh OUTDIR")
     a = ap.parse_args()
     ext = os.path.splitext(a.input)[1].lower()
     warnings = []
@@ -701,15 +703,24 @@ def main():
     if not chapters:
         sys.exit("No text could be extracted from this file.")
 
+    only_number = None
     if a.only:
         query = a.only.strip().lower()
         numbered = [("ch%02d" % (k + 1), c) for k, c in enumerate(c for c in chapters if classify(c["title"], 0, 0) == "chapter")]
-        matches = [(cid, c) for cid, c in numbered if query in (cid, cid[2:], str(int(cid[2:]))) or query in c["title"].strip().lower()]
+        # a number or ch-id query matches only the number/id — falling back to a title
+        # substring would make "--only 1" also match "Chapter 10", "Chapter 11", ...
+        m = re.fullmatch(r"(?:ch0*)?(\d+)", query)
+        if m:
+            num = int(m.group(1))
+            matches = [(cid, c) for cid, c in numbered if int(cid[2:]) == num]
+        else:
+            matches = [(cid, c) for cid, c in numbered if query in c["title"].strip().lower()]
         if not matches:
             sys.exit("--only '%s' matched no chapter. Available: %s" % (a.only, ", ".join("%s %s" % (cid, c["title"][:60]) for cid, c in numbered)))
         if len(matches) > 1:
             sys.exit("--only '%s' matched %d chapters (%s) — use the exact number or id" % (a.only, len(matches), ", ".join(cid for cid, _ in matches)))
         chapters = [matches[0][1]]
+        only_number = int(matches[0][0][2:])
 
     sample = " ".join(c["text"] for c in chapters)[:80000]
     lang = meta.get("language") or guess_language(sample)
@@ -721,7 +732,10 @@ def main():
     for f in os.listdir(os.path.join(a.outdir, "chapters")):
         if f.endswith(".md"):
             os.remove(os.path.join(a.outdir, "chapters", f))
-    entries, nch, nfr = [], 0, 0
+    # with --only, seed the counter so the single kept chapter keeps its real number
+    # (ch05, not ch01) — matters both for the docstring's promise and for resuming a
+    # course later against a full extraction without the ids colliding
+    entries, nch, nfr = [], (only_number - 1 if only_number else 0), 0
     for i, c in enumerate(chapters):
         kind = classify(c["title"], i, len(chapters))
         if kind == "chapter":
@@ -753,7 +767,9 @@ def main():
                 if h_["level"] > 1:
                     f.write("%s- %s\n" % ("  " * (h_["level"] - 2), h_["title"]))
             f.write("\n")
-    print("Title: %s | author: %s | language: %s | %d chapters (+%d front/back) | %d words" % (title, manifest["author"] or "?", lang, nch, nfr, manifest["total_words"]))
+    n_chapters = sum(1 for e in entries if e["kind"] == "chapter")
+    n_front = sum(1 for e in entries if e["kind"] != "chapter")
+    print("Title: %s | author: %s | language: %s | %d chapters (+%d front/back) | %d words" % (title, manifest["author"] or "?", lang, n_chapters, n_front, manifest["total_words"]))
     for e in entries:
         print("  %-8s %6d words  %s%s" % (e["id"], e["words"], e["title"][:70], "  [skipped]" if e["kind"] == "front" else ""))
     for w in warnings:
