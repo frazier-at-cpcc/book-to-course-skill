@@ -354,9 +354,15 @@ def check_block(b, where, lesson, ids, rep, counters):
                 rel = s.get("rel", b.get("rel", "="))
                 if not isinstance(rel, str) or not REL_RE.match(rel):
                     rep.err(sw, "`rel` must be a short (≤12 char) relation symbol like = or \\le")
-                lint_latex(rep, s.get("lhs") or "", sw + " lhs", bare=True)
-                lint_latex(rep, rel, sw + " rel", bare=True)
-                lint_latex(rep, s["rhs"], sw + " rhs", bare=True)
+                    rel = None
+                # lhs/rhs/rel are LaTeX source but authors (LLMs especially) will sometimes write
+                # a bare JSON number ("rhs": 4) — stringify before lint_latex, which indexes into
+                # the value expecting a string and otherwise raises a TypeError on an int/float
+                lhs = s.get("lhs")
+                lint_latex(rep, "" if lhs is None else str(lhs), sw + " lhs", bare=True)
+                if rel is not None:
+                    lint_latex(rep, rel, sw + " rel", bare=True)
+                lint_latex(rep, str(s["rhs"]), sw + " rhs", bare=True)
         if b.get("result"):
             lint_latex(rep, str(b["result"]), where + " result", bare=True)
 

@@ -634,7 +634,7 @@ function derivationBlock(b) {
   }
   const ctl = stepControls(b.steps.length, idx => sync(idx));
   const allBtn = h("button", { class: "btn ghost sm", type: "button", onclick: () => {
-    showAll = !showAll; allBtn.textContent = showAll ? t("hideAll") : t("showAll"); sync(ctl.idx);
+    showAll = !showAll; allBtn.textContent = showAll ? t("stepByStep") : t("showAll"); sync(ctl.idx);
   } }, t("showAll"));
   ctl.row.append(allBtn);
   const rowsEl = h("div", { class: "dv-rows" }, rows.map(r => r.el));
@@ -642,7 +642,7 @@ function derivationBlock(b) {
     h("h3", { class: "block-title" }, "🧮 " + (b.title || t("derivation"))),
     b.intro ? h("div", { html: md(b.intro) }) : null,
     rowsEl, ctl.dots, ctl.row,
-    b.result != null ? h("div", { class: "dv-result" }, h("strong", null, t("result") + ": "), h("span", { html: tex2mml(String(b.result), false) })) : null,
+    b.result ? h("div", { class: "dv-result" }, h("strong", null, t("result") + ": "), h("span", { html: tex2mml(String(b.result), false) })) : null,
     b.note ? h("div", { class: "text", html: md(b.note) }) : null);
   ctl.go(0); return root;
 }
