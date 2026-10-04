@@ -27,6 +27,9 @@ BLOCK_REQ = {
 CALLOUTS = {"tip", "note", "warning", "analogy", "key", "example"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 EX_MINUTES = {"easy": 8, "medium": 15, "hard": 25}
+# player UI chrome (buttons, labels, messages) only ships in these — keep in sync with
+# the keys of STR in assets/template/assets/app.js
+UI_LANG_PACKS = {"pl", "en"}
 
 
 class Report:
@@ -270,6 +273,10 @@ def main():
             rep.err("content/course.json", "missing `%s`" % k)
     meta.setdefault("ui_lang", "pl")
     meta.setdefault("language", meta["ui_lang"])
+    if meta["ui_lang"] not in UI_LANG_PACKS:
+        rep.warn("content/course.json", "ui_lang '%s' has no matching player UI pack (have: %s) — buttons and "
+                  "labels will show in English while your lesson content stays in '%s'" % (
+                      meta["ui_lang"], ", ".join(sorted(UI_LANG_PACKS)), meta["ui_lang"]))
     if not meta.get("description"):
         rep.warn("content/course.json", "no `description` — one or two friendly sentences for the home page")
 
