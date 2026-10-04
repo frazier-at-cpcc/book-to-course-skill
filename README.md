@@ -11,6 +11,29 @@ Turn a book into an interactive course you can run locally in a browser. This Cl
 
 For coding exercises, the skill checks that the tests fail on the starter code and pass on a reference solution before packaging the course. When a book does not call for code, the course can use other practice activities, such as self-check exercises.
 
+## Demo
+
+A Go programming course: an animated code walkthrough, a quiz, flashcards, and an exercise whose unit tests run from the page.
+
+![Demo of a Go course: code walkthrough, quiz, flashcards and passing exercise tests](doc/gifs/go-course-demo.gif)
+
+A math course: formulas written in LaTeX render in lesson text, tables, quizzes, and flashcards.
+
+![Demo of a math course with rendered formulas, a quiz and flashcards](doc/gifs/math-course-demo.gif)
+
+## Installation
+
+This repository is a [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) plugin marketplace. In Claude Code, add the marketplace and install the plugin:
+
+```
+/plugin marketplace add sebastianhaba/book-to-course-skill
+/plugin install book-to-course@book-to-course
+```
+
+Then attach a book and ask Claude to turn it into a course, for example: *"Turn this book into an interactive course."*
+
+To update to the latest version later, run `/plugin marketplace update book-to-course`.
+
 ## Example course
 
 These screenshots show a course generated from a Go programming book:

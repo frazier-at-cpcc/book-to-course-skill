@@ -12,6 +12,7 @@
     {
       "name": "book-to-course",
       "source": "./",
+      "skills": ["./book-to-course"],
       "description": "Turn a book or document (EPUB, PDF, HTML, DOCX, Markdown, TXT) into an interactive, beginner-friendly course delivered as a local web page.",
       "version": "1.0.0",
       "author": {
