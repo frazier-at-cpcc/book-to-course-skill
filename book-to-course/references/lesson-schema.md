@@ -54,7 +54,15 @@ and a "new terms" box at the end of the lesson (first definition of a term wins)
 ## Text formatting (used in every `md`, `goal`, `explanation`, `hint`… field)
 Paragraphs separated by blank lines; `**bold**`, `*italic*`, `` `code` ``, `[text](https://…)`, `- bullets`, `1. numbered`, `> quote`,
 `### small heading`, and fenced code blocks (```go … ```). HTML is escaped, so write plain text. No tables or nested lists inside `md`
-(use the `table` block). No math renderer: write formulas in plain text/Unicode (x², ≤, √) or as an `svg`.
+(use the `table` block).
+
+Math: `$...$` for inline formulas, `$$...$$` on its own line(s) for display formulas, in any `md`/text field (including
+table cells, quiz options, flashcard faces). A literal dollar sign is `\$` (e.g. "it costs \$5"). LaTeX is translated to
+MathML by a small built-in subset — see `references/math.md` for exactly which commands are supported. An unsupported
+command or unbalanced braces/`$` is a **build error** naming the file, block and the bad command, so a broken formula
+never reaches the page; in the rendered page itself (if it somehow gets past the build) it shows as the raw LaTeX source
+with a dotted underline instead of blanking the lesson. There is no plot/graph renderer: draw geometry or function graphs
+as an `svg`.
 
 ## Block types
 
@@ -153,6 +161,9 @@ completes the lesson; retries are allowed and the best score is kept. Mix questi
 
 ## What the builder enforces
 Errors (no `data.js` until fixed): invalid JSON, unknown block/question type, missing required fields, answers out of range,
-duplicate ids, table rows of the wrong width, missing exercise files / `_solution/`, test lesson without a quiz.
-Warnings (read them): text block > 220 words, `from_book` > 120 words, question without explanation or hint, lesson without
-`summary` or practice, chapter without test or exercise, practice share outside 30–70%.
+duplicate ids, table rows of the wrong width, missing exercise files / `_solution/`, test lesson without a quiz, and for
+any `$...$`/`$$...$$` formula: unbalanced `{}`/`$`, unmatched `\left`/`\right` or `\begin`/`\end`, or a command outside the
+supported subset (`references/math.md`).
+Warnings (read them): text block > 220 words (math formulas count as one word each, not their LaTeX source length),
+`from_book` > 120 words, question without explanation or hint, lesson without `summary` or practice, chapter without test
+or exercise, practice share outside 30–70%, a `$amount` that looks like currency rather than math (escape it as `\$`).

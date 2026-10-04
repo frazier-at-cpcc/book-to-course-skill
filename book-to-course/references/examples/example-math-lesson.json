@@ -1,0 +1,113 @@
+{
+  "title": "The quadratic formula",
+  "summary": "Derive and use the formula that solves any quadratic equation.",
+  "source": {
+    "chapter": "ch03",
+    "sections": [
+      "Solving quadratic equations"
+    ]
+  },
+  "blocks": [
+    {
+      "type": "text",
+      "md": "A quadratic equation has the form $ax^2 + bx + c = 0$, with $a \\ne 0$. Any such equation can be solved with one formula, no matter what $a$, $b$ and $c$ are."
+    },
+    {
+      "type": "callout",
+      "kind": "key",
+      "md": "The quadratic formula:\n\n$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Symbol",
+        "Meaning"
+      ],
+      "rows": [
+        [
+          "$a$, $b$, $c$",
+          "the equation's coefficients"
+        ],
+        [
+          "$\\Delta = b^2 - 4ac$",
+          "the discriminant — its sign tells you how many real roots exist"
+        ]
+      ]
+    },
+    {
+      "type": "callout",
+      "kind": "warning",
+      "md": "A graphing calculator for this chapter costs about \\$15 — that's a dollar sign, not a formula, so it stays plain text."
+    },
+    {
+      "type": "reveal",
+      "prompt": "What happens to the formula when $\\Delta < 0$?",
+      "md": "$\\sqrt{\\Delta}$ has no real value, so the equation has no real roots — only complex ones."
+    },
+    {
+      "type": "quiz",
+      "id": "ex-math-quiz-quadratic",
+      "title": "Quick check",
+      "questions": [
+        {
+          "type": "single",
+          "q": "For $x^2 - 5x + 6 = 0$, what is the discriminant $\\Delta$?",
+          "options": [
+            "$1$",
+            "$\\Delta = 1$",
+            "$\\Delta = -1$",
+            "$\\Delta = 25$"
+          ],
+          "answer": 1,
+          "hint": "$\\Delta = b^2 - 4ac$ with $a=1$, $b=-5$, $c=6$.",
+          "explanation": "$(-5)^2 - 4(1)(6) = 25 - 24 = 1$, so $\\Delta = 1$."
+        },
+        {
+          "type": "fill",
+          "q": "Solve $x^2 - 5x + 6 = 0$ for the larger root.",
+          "answer": [
+            "3"
+          ],
+          "hint": [
+            "Use the formula with $a=1$, $b=-5$, $c=6$.",
+            "$x = \\frac{5 \\pm 1}{2}$."
+          ],
+          "explanation": "$x = \\frac{5 \\pm \\sqrt{1}}{2}$ gives $x = 3$ or $x = 2$; the larger root is $3$."
+        }
+      ]
+    },
+    {
+      "type": "flashcards",
+      "id": "ex-math-cards-quadratic",
+      "title": "Terms and notation",
+      "cards": [
+        {
+          "front": "$\\Delta$",
+          "back": "The discriminant, $b^2 - 4ac$."
+        },
+        {
+          "front": "$x \\in \\mathbb{R}$",
+          "back": "$x$ is a real number."
+        },
+        {
+          "front": "$A \\in \\begin{pmatrix}a & b\\\\ c & d\\end{pmatrix}$",
+          "back": "A 2×2 matrix with entries $a, b, c, d$."
+        }
+      ]
+    },
+    {
+      "type": "summary",
+      "points": [
+        "Any quadratic $ax^2+bx+c=0$ (with $a \\ne 0$) is solved by $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$.",
+        "The discriminant $\\Delta = b^2-4ac$ tells you how many real roots there are.",
+        "A dollar amount in prose is written with \\$ so it isn't read as a formula."
+      ]
+    }
+  ],
+  "terms": [
+    {
+      "term": "discriminant",
+      "def": "the quantity $\\Delta = b^2 - 4ac$ under the square root in the quadratic formula"
+    }
+  ]
+}

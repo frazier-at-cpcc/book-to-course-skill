@@ -106,7 +106,8 @@ built course is fully usable: unfinished chapters simply don't appear yet.
 
 ## Variants
 
-- **Non-programming books** (history, math, language, theory): use quizzes, flashcards, `reveal` prompts, tables, SVG/flow diagrams, and `selfcheck` exercises (write-and-compare tasks with a checklist). There is no formula renderer — write math in plain text/Unicode or draw it as SVG.
+- **Non-programming books** (history, language, theory): use quizzes, flashcards, `reveal` prompts, tables, SVG/flow diagrams, and `selfcheck` exercises (write-and-compare tasks with a checklist).
+- **Mathematics textbooks**: write equations as `$...$` (inline) or `$$...$$` (display) in any `md`/text field — see `references/math.md` for the supported LaTeX subset. `svg` is still the right tool for geometry and freehand diagrams, not for equations. Practice means `fill` questions with a numeric answer and `order` of proof steps, not more reading.
 - **Language-learning books**: heavy on flashcards, `fill` and `order` questions; keep example sentences from the book short.
 - **Figures in the book**: don't copy images; re-draw the idea as an `svg` or `flow` block, or describe it in a `table`.
 - **Course language ≠ book language**: translate explanations; keep code and official term names, adding the translation in `terms`.
