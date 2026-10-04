@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Extract a book into per-chapter Markdown files plus a manifest.
 
-Usage:  extract_book.py INPUT OUTDIR [--chunk-pages 25]
+Usage:  extract_book.py INPUT OUTDIR [--chunk-pages 25] [--only CHAPTER]
 
 INPUT may be .epub, .pdf, .html/.htm/.xhtml, .docx, .md/.markdown or .txt.
 Standard library only; PDFs use `pdftotext` (poppler) when present, else `pypdf`.
+
+--only CHAPTER limits the output to a single chapter — handy to try a course (or a new
+feature) on one chapter before committing to the whole book. CHAPTER may be its 1-based
+number (3), its id once extracted (ch03), or a case-insensitive substring of its title.
+The resulting OUTDIR/manifest.json then has just that one chapter, so init_course.py
+scaffolds a course scoped to it.
 
 Writes:
   OUTDIR/manifest.json         title, author, language, chapters (id, title, file, words, kind, headings)
@@ -391,7 +397,7 @@ def read_html(path):
 def read_text(path):
     raw = open(path, "rb").read().decode("utf-8", "replace")
     if not path.lower().endswith((".md", ".markdown")):
-        raw = re.sub(r"^((?:chapter|rozdzia[łl]|cz[ęe][śs][ćc]|part)\s+(?:\d+|[ivxlc]+)\b.*)$", r"# \1", raw, flags=re.I | re.M)
+        raw = re.sub(r"^((?:chapter|rozdzia[łl]|cz[ęe][śs][ćc]|part|cap[íi]tulo|chapitre|capitolo|kapitel)\s+(?:\d+|[ivxlc]+)\b.*)$", r"# \1", raw, flags=re.I | re.M)
     return {"title": first_heading(raw)[1], "author": "", "language": ""}, split_by_headings(raw)
 
 
@@ -625,7 +631,7 @@ def read_pdf(path, chunk_pages):
         if not starts:
             starts = [(t, p) for d, t, p in outline if d == 0]
     if len(starts) < 3:
-        pat = re.compile(r"^\s*(chapter|rozdzia[łl]|cz[ęe][śs][ćc]|part)\s+(\d+|[ivxlc]+)\b(.*)$", re.I)
+        pat = re.compile(r"^\s*(chapter|rozdzia[łl]|cz[ęe][śs][ćc]|part|cap[íi]tulo|chapitre|capitolo|kapitel)\s+(\d+|[ivxlc]+)\b(.*)$", re.I)
         found = []
         for i, p in enumerate(pages):
             for l in [x for x in p.split("\n") if x.strip()][:4]:
@@ -656,6 +662,7 @@ def main():
     ap.add_argument("input")
     ap.add_argument("outdir")
     ap.add_argument("--chunk-pages", type=int, default=25, help="PDF without usable outline: pages per part")
+    ap.add_argument("--only", help="limit extraction to one chapter: its number (3), id (ch03), or a substring of its title")
     a = ap.parse_args()
     ext = os.path.splitext(a.input)[1].lower()
     warnings = []
@@ -693,6 +700,16 @@ def main():
     chapters = [c for c in chapters if c["text"].strip()]
     if not chapters:
         sys.exit("No text could be extracted from this file.")
+
+    if a.only:
+        query = a.only.strip().lower()
+        numbered = [("ch%02d" % (k + 1), c) for k, c in enumerate(c for c in chapters if classify(c["title"], 0, 0) == "chapter")]
+        matches = [(cid, c) for cid, c in numbered if query in (cid, cid[2:], str(int(cid[2:]))) or query in c["title"].strip().lower()]
+        if not matches:
+            sys.exit("--only '%s' matched no chapter. Available: %s" % (a.only, ", ".join("%s %s" % (cid, c["title"][:60]) for cid, c in numbered)))
+        if len(matches) > 1:
+            sys.exit("--only '%s' matched %d chapters (%s) — use the exact number or id" % (a.only, len(matches), ", ".join(cid for cid, _ in matches)))
+        chapters = [matches[0][1]]
 
     sample = " ".join(c["text"] for c in chapters)[:80000]
     lang = meta.get("language") or guess_language(sample)
