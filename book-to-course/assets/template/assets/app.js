@@ -5,61 +5,11 @@
 const C = window.COURSE;
 if (!C) { document.body.innerHTML = "<p style='padding:2rem;font-family:sans-serif'>Missing course/data.js — run scripts/build_course.py first.</p>"; return; }
 
-/* ───────────── i18n ───────────── */
-const STR = {
-  pl: {
-    home: "Start", glossary: "Słowniczek", cont: "Kontynuuj", startCourse: "Zacznij kurs", lessonsDone: "Ukończone lekcje",
-    exercisesDone: "Zaliczone ćwiczenia", quizScore: "Poprawne odpowiedzi w quizach", minLeft: "Do końca około", min: "min",
-    chapter: "Rozdział", lesson: "Lekcja", test: "Test rozdziału", quiz: "Szybki quiz", exercise: "Ćwiczenie", flashcards: "Fiszki",
-    summary: "Najważniejsze", frombook: "Z książki", terms: "Nowe pojęcia", check: "Sprawdź", checkTest: "Sprawdź test",
-    retry: "Spróbuj ponownie", hint: "Podpowiedź", showAnswer: "Pokaż odpowiedź", correct: "Dobrze!", wrong: "Jeszcze nie.",
-    score: "Wynik", passed: "Zaliczone", failed: "Niezaliczone", needScore: "Wymagane: {0}%", best: "najlepszy",
-    unanswered: "Pytań bez odpowiedzi: {0}. Sprawdzić mimo to?", tTrue: "Prawda", tFalse: "Fałsz", next: "Dalej", prev: "Wstecz",
-    again: "Od nowa", step: "Krok {0} z {1}", reveal: "Pokaż odpowiedź", thinkFirst: "Zastanów się, zanim klikniesz.",
-    goal: "Cel", behavior: "Co ma robić program", examples: "Przykłady wejścia i wyjścia", input: "Wejście", output: "Oczekiwane wyjście",
-    startFiles: "Pliki startowe", testFiles: "Testy (możesz je przeczytać)", whereToWork: "Gdzie pracować", runCmd: "Polecenie w terminalu",
-    runTests: "Uruchom testy", running: "Uruchamiam…", noServer: "Aby uruchamiać testy jednym kliknięciem, otwórz kurs przez start.sh / start.bat. Możesz też uruchomić polecenie ręcznie w terminalu.",
-    markDone: "Zaznacz jako zaliczone", markUndone: "Cofnij zaliczenie", showSolution: "Pokaż rozwiązanie", hideSolution: "Ukryj rozwiązanie",
-    confirmSolution: "Spróbuj jeszcze raz samodzielnie! Na pewno pokazać rozwiązanie?", stTodo: "Do zrobienia", stPassed: "Zaliczone",
-    stFailed: "Testy jeszcze nie przechodzą", easy: "łatwe", medium: "średnie", hard: "trudne", checklist: "Sprawdź siebie",
-    know: "Znam", notYet: "Jeszcze nie", flipHint: "Kliknij kartę, aby ją odwrócić", cardsLeft: "Do opanowania: {0}",
-    allKnown: "Wszystkie fiszki opanowane! 🎉", finishLesson: "Ukończ lekcję", lessonDone: "Lekcja ukończona 🎉", nextLesson: "Następna lekcja",
-    yourPractice: "Twoja praktyka", quizzes: "Quizy", exercises: "Ćwiczenia", later: "Możesz wrócić do ćwiczeń później — lekcję i tak można ukończyć.",
-    reset: "Wyzeruj postęp", resetConfirm: "Na pewno wyzerować cały postęp?", savedFile: "💾 zapisano w pliku", savedBrowser: "💾 zapisano w przeglądarce",
-    search: "Szukaj pojęcia…", none: "Brak wyników", courseDone: "Cały kurs ukończony! 🎓", passTest: "Zalicz test, aby ukończyć ten rozdział.",
-    solution: "Rozwiązanie wzorcowe", yourAnswer: "Twoja odpowiedź", correctIs: "Poprawna odpowiedź", moveUp: "W górę", moveDown: "W dół",
-    copy: "Kopiuj", copied: "Skopiowano", progressFile: "Postęp zapisuje się w folderze progress/.", exitCode: "kod wyjścia", testsOk: "Wszystkie testy przeszły ✓",
-    testsFail: "Testy nie przechodzą — przeczytaj komunikaty poniżej i popraw kod.", serverErr: "Nie udało się połączyć z pomocnikiem (serve.py).",
-    timedOut: "Przekroczono limit czasu — sprawdź, czy program nie zapętla się.", questionsN: "pytań", attempts: "podejść", readTime: "czytanie + praktyka", chOf: "Rozdział {0}", openSidebar: "Menu"
-  },
-  en: {
-    home: "Home", glossary: "Glossary", cont: "Continue", startCourse: "Start the course", lessonsDone: "Lessons completed",
-    exercisesDone: "Exercises passed", quizScore: "Correct quiz answers", minLeft: "About", min: "min",
-    chapter: "Chapter", lesson: "Lesson", test: "Chapter test", quiz: "Quick quiz", exercise: "Exercise", flashcards: "Flashcards",
-    summary: "Key takeaways", frombook: "From the book", terms: "New terms", check: "Check", checkTest: "Check test",
-    retry: "Try again", hint: "Hint", showAnswer: "Show answer", correct: "Correct!", wrong: "Not yet.",
-    score: "Score", passed: "Passed", failed: "Not passed", needScore: "Required: {0}%", best: "best",
-    unanswered: "Unanswered questions: {0}. Check anyway?", tTrue: "True", tFalse: "False", next: "Next", prev: "Back",
-    again: "Restart", step: "Step {0} of {1}", reveal: "Show answer", thinkFirst: "Think about it before you click.",
-    goal: "Goal", behavior: "What the program should do", examples: "Input and output examples", input: "Input", output: "Expected output",
-    startFiles: "Starter files", testFiles: "Tests (you can read them)", whereToWork: "Where to work", runCmd: "Terminal command",
-    runTests: "Run tests", running: "Running…", noServer: "To run tests with one click, open the course via start.sh / start.bat. You can also run the command yourself in a terminal.",
-    markDone: "Mark as passed", markUndone: "Undo", showSolution: "Show solution", hideSolution: "Hide solution",
-    confirmSolution: "Try once more on your own first! Really show the solution?", stTodo: "To do", stPassed: "Passed",
-    stFailed: "Tests not passing yet", easy: "easy", medium: "medium", hard: "hard", checklist: "Check yourself",
-    know: "I know it", notYet: "Not yet", flipHint: "Click the card to flip it", cardsLeft: "Left to learn: {0}",
-    allKnown: "All cards mastered! 🎉", finishLesson: "Finish lesson", lessonDone: "Lesson completed 🎉", nextLesson: "Next lesson",
-    yourPractice: "Your practice", quizzes: "Quizzes", exercises: "Exercises", later: "You can come back to the exercises later — you can still finish the lesson.",
-    reset: "Reset progress", resetConfirm: "Really reset all progress?", savedFile: "💾 saved to file", savedBrowser: "💾 saved in browser",
-    search: "Search terms…", none: "No results", courseDone: "Whole course completed! 🎓", passTest: "Pass the test to complete this chapter.",
-    solution: "Reference solution", yourAnswer: "Your answer", correctIs: "Correct answer", moveUp: "Up", moveDown: "Down",
-    copy: "Copy", copied: "Copied", progressFile: "Progress is saved in the progress/ folder.", exitCode: "exit code", testsOk: "All tests passed ✓",
-    testsFail: "Tests are failing — read the messages below and fix your code.", serverErr: "Could not reach the helper (serve.py).",
-    timedOut: "Time limit exceeded — check for an infinite loop.", questionsN: "questions", attempts: "attempts", readTime: "reading + practice", chOf: "Chapter {0}", openSidebar: "Menu"
-  }
-};
-const L = STR[C.meta.ui_lang] || STR.en;
-const t = (k, ...a) => { let s = L[k] != null ? L[k] : (STR.en[k] != null ? STR.en[k] : k); a.forEach((v, i) => { s = s.split("{" + i + "}").join(v); }); return s; };
+/* ───────────── i18n ─────────────
+   UI strings live in the skill's assets/i18n/<ui_lang>/strings.json; build_course.py bundles the course's
+   language into course/data.js as C.ui, with English filling any key that language lacks. */
+const L = C.ui || {};
+const t = (k, ...a) => { let s = L[k] != null ? L[k] : k; a.forEach((v, i) => { s = s.split("{" + i + "}").join(v); }); return s; };
 
 /* ───────────── tiny DOM helpers ───────────── */
 function h(tag, props, ...kids) {
@@ -275,12 +225,11 @@ function celebrate(count) {
 
 /* ───────────── blocks ───────────── */
 const CALLOUT_ICON = { tip: "💡", note: "📝", warning: "⚠️", analogy: "🧩", key: "🔑", example: "🔍" };
-const CALLOUT_NAME = { pl: { tip: "Wskazówka", note: "Uwaga", warning: "Uważaj", analogy: "Analogia", key: "Zapamiętaj", example: "Przykład" }, en: { tip: "Tip", note: "Note", warning: "Careful", analogy: "Analogy", key: "Remember", example: "Example" } };
 
 function renderBlock(b, les) {
   switch (b.type) {
     case "text": return h("div", { class: "block text" }, b.title ? h("h3", null, b.title) : null, h("div", { html: md(b.md) }));
-    case "callout": { const kind = CALLOUT_ICON[b.kind] ? b.kind : "note"; const nm = (CALLOUT_NAME[C.meta.ui_lang] || CALLOUT_NAME.en)[kind];
+    case "callout": { const kind = CALLOUT_ICON[b.kind] ? b.kind : "note"; const nm = t("callout_" + kind);
       return h("aside", { class: "block callout " + kind }, h("div", { class: "c-title" }, CALLOUT_ICON[kind], " ", b.title || nm), h("div", { html: md(b.md) })); }
     case "code": return h("div", { class: "block" }, b.title ? h("h4", null, b.title) : null, codeBlock(b),
       b.output ? [h("div", { class: "out-label" }, "▶ " + (b.output_label || t("output"))), h("pre", { class: "term" }, b.output)] : null, b.explain ? h("div", { class: "text", html: md(b.explain) }) : null);

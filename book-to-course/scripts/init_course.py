@@ -2,7 +2,7 @@
 """Create (or refresh) a course folder from the page template.
 
 Usage:
-  init_course.py COURSE_DIR --extract EXTRACT_DIR [--title T] [--ui-lang pl|en]
+  init_course.py COURSE_DIR --extract EXTRACT_DIR [--title T] [--ui-lang CODE]
   init_course.py COURSE_DIR --update          # re-copy player files only (index.html, assets/, serve.py, start.*)
 
 New course folder layout:
@@ -21,6 +21,8 @@ import re
 import shutil
 import sys
 import unicodedata
+
+from ui_langs import CODE_RE, readme_for, ui_lang_packs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(os.path.dirname(HERE), "assets", "template")
@@ -44,8 +46,7 @@ def copy_player(dest, ui_lang):
         shutil.copyfile(src, dst)
         if rel.endswith((".sh", ".py")):
             os.chmod(dst, 0o755)
-    readme = os.path.join(TEMPLATE, "README.%s.md" % ("en" if ui_lang == "en" else "pl"))
-    shutil.copyfile(readme, os.path.join(dest, "README.md"))
+    shutil.copyfile(readme_for(ui_lang), os.path.join(dest, "README.md"))
 
 
 def main():
@@ -53,9 +54,11 @@ def main():
     ap.add_argument("course_dir")
     ap.add_argument("--extract", help="folder produced by extract_book.py")
     ap.add_argument("--title")
-    ap.add_argument("--ui-lang", choices=["pl", "en"], help="language of the course (explanations + interface)")
+    ap.add_argument("--ui-lang", help="language code of the course, e.g. pl, en (explanations + interface)")
     ap.add_argument("--update", action="store_true")
     a = ap.parse_args()
+    if a.ui_lang is not None and not CODE_RE.match(a.ui_lang):
+        ap.error("--ui-lang expects a language code like pl, en or pt-BR, got %r" % a.ui_lang)
     dest = os.path.abspath(a.course_dir)
 
     if a.update:
@@ -76,6 +79,10 @@ def main():
     if os.path.exists(os.path.join(dest, ".build", "state.json")):
         sys.exit("%s already is a course (has .build/state.json). Use --update to refresh the player, or pick another folder." % dest)
     ui_lang = a.ui_lang or manifest.get("language") or "pl"
+    packs = ui_lang_packs()
+    if ui_lang not in packs:
+        print("NOTE: no player UI pack for '%s' (have: %s) — buttons and labels will show in English. "
+              "Add assets/i18n/%s/ (strings.json + README.md) to translate them." % (ui_lang, ", ".join(sorted(packs)), ui_lang))
     title = a.title or manifest["title"]
 
     copy_player(dest, ui_lang)

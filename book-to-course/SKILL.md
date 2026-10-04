@@ -27,7 +27,7 @@ Scripts (all in `scripts/`, standard library only):
 | script | purpose |
 |---|---|
 | `extract_book.py INPUT OUTDIR` | book → chapter Markdown files + `manifest.json` + `outline.md` |
-| `init_course.py DIR --extract OUTDIR [--ui-lang pl\|en]` | create course folder, copy player, create state |
+| `init_course.py DIR --extract OUTDIR [--ui-lang CODE]` | create course folder, copy player, create state |
 | `course_state.py DIR status\|next\|set\|note\|log` | where the build stands (resume across sessions) |
 | `build_course.py DIR [--single-file OUT.html]` | validate lessons, print theory/practice balance, write `course/data.js` |
 | `verify_exercises.py DIR` | tests must FAIL on starter and PASS on solution |

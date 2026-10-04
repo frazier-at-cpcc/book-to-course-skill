@@ -19,6 +19,8 @@ import re
 import shlex
 import sys
 
+from ui_langs import ui_lang_packs, ui_strings
+
 BLOCK_REQ = {
     "text": ["md"], "callout": ["md"], "code": ["code"], "stepper": ["steps"], "reveal": ["prompt", "md"],
     "from_book": ["md"], "table": ["headers", "rows"], "flow": ["nodes"], "svg": ["svg"], "quiz": ["questions"],
@@ -27,9 +29,6 @@ BLOCK_REQ = {
 CALLOUTS = {"tip", "note", "warning", "analogy", "key", "example"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 EX_MINUTES = {"easy": 8, "medium": 15, "hard": 25}
-# player UI chrome (buttons, labels, messages) only ships in these — keep in sync with
-# the keys of STR in assets/template/assets/app.js
-UI_LANG_PACKS = {"pl", "en"}
 
 
 class Report:
@@ -273,10 +272,15 @@ def main():
             rep.err("content/course.json", "missing `%s`" % k)
     meta.setdefault("ui_lang", "pl")
     meta.setdefault("language", meta["ui_lang"])
-    if meta["ui_lang"] not in UI_LANG_PACKS:
+    packs = ui_lang_packs()
+    ui, missing = ui_strings(meta["ui_lang"])
+    if meta["ui_lang"] not in packs:
         rep.warn("content/course.json", "ui_lang '%s' has no matching player UI pack (have: %s) — buttons and "
                   "labels will show in English while your lesson content stays in '%s'" % (
-                      meta["ui_lang"], ", ".join(sorted(UI_LANG_PACKS)), meta["ui_lang"]))
+                      meta["ui_lang"], ", ".join(sorted(packs)), meta["ui_lang"]))
+    elif missing:
+        rep.warn("content/course.json", "UI pack '%s' lacks %d key(s), shown in English: %s" % (
+            meta["ui_lang"], len(missing), ", ".join(missing)))
     if not meta.get("description"):
         rep.warn("content/course.json", "no `description` — one or two friendly sentences for the home page")
 
@@ -391,7 +395,7 @@ def main():
             sys.exit(1)
 
     data = {"meta": dict(meta, built_at=datetime.datetime.now().astimezone().isoformat(timespec="seconds"), version=1),
-            "chapters": chapters, "lessons": lessons, "glossary": gl}
+            "ui": ui, "chapters": chapters, "lessons": lessons, "glossary": gl}
     js = "window.COURSE = " + json.dumps(data, ensure_ascii=False).replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ";\n"
     os.makedirs(os.path.join(root, "course"), exist_ok=True)
     with open(os.path.join(root, "course", "data.js"), "w", encoding="utf-8") as f:

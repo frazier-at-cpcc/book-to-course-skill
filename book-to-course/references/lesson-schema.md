@@ -31,7 +31,7 @@ They are auto-generated when omitted (`<lesson-id>-quiz1`) but **write explicit 
   "ui_lang": "pl", "language": "pl", "level": "beginner",
   "source": { "title": "Original book title", "author": "Author", "file": "book.epub" } }
 ```
-`ui_lang` is `pl` or `en` (interface strings). Created by `init_course.py`; you fill `subtitle` and `description`.
+`ui_lang` is the language code of the interface strings. The player ships `pl` and `en`; any other code works but shows English buttons and labels (build_course.py warns). To add a language, copy `assets/i18n/en/` to `assets/i18n/<code>/` and translate its `strings.json` (values only — keys stay as they are) and `README.md`. Created by `init_course.py`; you fill `subtitle` and `description`.
 
 ## chapter.json
 ```json
