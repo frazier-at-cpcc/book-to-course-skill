@@ -105,5 +105,10 @@
   "callout_warning": "Uważaj",
   "callout_analogy": "Analogia",
   "callout_key": "Zapamiętaj",
-  "callout_example": "Przykład"
+  "callout_example": "Przykład",
+  "derivation": "Wyprowadzenie",
+  "why": "Dlaczego",
+  "result": "Wynik",
+  "showAll": "Pokaż wszystko",
+  "stepByStep": "Krok po kroku"
 }

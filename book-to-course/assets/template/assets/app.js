@@ -575,6 +575,7 @@ function renderBlock(b, les) {
     case "code": return h("div", { class: "block" }, b.title ? h("h4", null, b.title) : null, codeBlock(b),
       b.output ? [h("div", { class: "out-label" }, "▶ " + (b.output_label || t("output"))), h("pre", { class: "term" }, b.output)] : null, b.explain ? h("div", { class: "text", html: md(b.explain) }) : null);
     case "stepper": return stepperBlock(b);
+    case "derivation": return derivationBlock(b);
     case "reveal": return revealBlock(b);
     case "from_book": return h("figure", { class: "block frombook", style: "margin-left:auto;margin-right:auto" }, h("div", { class: "fb-label" }, "📖 " + t("frombook") + (b.source ? " · " + b.source : "")), h("div", { html: md(b.md) }), b.code ? codeBlock({ code: b.code, lang: b.lang }) : null);
     case "table": return h("div", { class: "block tablewrap" }, h("table", null, h("thead", null, h("tr", null, b.headers.map(x => h("th", { html: inline(x) })))), h("tbody", null, b.rows.map(r => h("tr", null, r.map(c => h("td", { html: inline(c) })))))));
@@ -588,20 +589,62 @@ function renderBlock(b, les) {
   }
 }
 
-function stepperBlock(b) {
+/* shared by stepperBlock and derivationBlock: dots + prev/next + "Step X of N", driven by
+   an external onStep(idx, dir) callback that each block uses to render its own content */
+function stepControls(n, onStep) {
   let idx = 0;
-  const stage = h("div", { class: "stepper-stage" }), dots = h("div", { class: "dots" }), meta = h("div", { class: "note-small" });
+  const dots = h("div", { class: "dots" }), meta = h("div", { class: "note-small" });
   const prev = h("button", { class: "btn ghost sm", type: "button", onclick: () => go(idx - 1, "prev") }, "← " + t("prev"));
   const next = h("button", { class: "btn sm", type: "button", onclick: () => go(idx + 1, "next") }, t("next") + " →");
   function go(i, dir) {
-    idx = Math.max(0, Math.min(b.steps.length - 1, i)); const s = b.steps[idx];
+    idx = Math.max(0, Math.min(n - 1, i));
+    dots.replaceChildren(...Array.from({ length: n }, (_, j) => h("button", { class: "dot" + (j === idx ? " on" : j < idx ? " past" : ""), type: "button", "aria-label": t("step", j + 1, n), onclick: () => go(j, j > idx ? "next" : "prev") })));
+    meta.textContent = t("step", idx + 1, n); prev.disabled = idx === 0; next.disabled = idx === n - 1;
+    onStep(idx, dir);
+  }
+  const row = h("div", { class: "row" }, prev, next, meta);
+  return { row, dots, go, get idx() { return idx; } };
+}
+function stepperBlock(b) {
+  const stage = h("div", { class: "stepper-stage" });
+  const ctl = stepControls(b.steps.length, (idx, dir) => {
+    const s = b.steps[idx];
     stage.className = "stepper-stage"; void stage.offsetWidth; if (dir) stage.classList.add("anim-" + dir);
     fill(stage, h("div", { class: "step-title" }, (idx + 1) + ". " + (s.title || "")), s.md ? h("div", { html: md(s.md) }) : null, s.code ? codeBlock({ code: s.code, lang: s.lang || b.lang, highlight: s.highlight, file: s.file }) : null, s.output ? [h("div", { class: "out-label" }, "▶ " + t("output")), h("pre", { class: "term" }, s.output)] : null);
-    dots.replaceChildren(...b.steps.map((_, j) => h("button", { class: "dot" + (j === idx ? " on" : j < idx ? " past" : ""), type: "button", "aria-label": t("step", j + 1, b.steps.length), onclick: () => go(j, j > idx ? "next" : "prev") })));
-    meta.textContent = t("step", idx + 1, b.steps.length); prev.disabled = idx === 0; next.disabled = idx === b.steps.length - 1;
+  });
+  const root = h("div", { class: "block stepper" }, h("h3", { class: "block-title" }, "🪜 " + (b.title || "")), stage, ctl.dots, ctl.row);
+  ctl.go(0); return root;
+}
+function derivationBlock(b) {
+  const rel0 = b.rel || "=";
+  let showAll = false;
+  const rows = b.steps.map(s => {
+    const lhs = h("span", { class: "dv-lhs", html: s.lhs ? tex2mml(s.lhs, false) : "" });
+    const rel = h("span", { class: "dv-rel", html: tex2mml(s.rel || rel0, false) });
+    const rhs = h("span", { class: "dv-rhs", html: tex2mml(s.rhs, false) });
+    const why = h("div", { class: "dv-why", html: s.why ? md(s.why) : "" });
+    return { el: h("div", { class: "dv-row" }, lhs, rel, rhs, why) };
+  });
+  function sync(idx) {
+    rows.forEach((r, i) => {
+      r.el.classList.toggle("hidden", !showAll && i > idx);
+      r.el.classList.toggle("cur", !showAll && i === idx);
+      r.el.classList.toggle("past", showAll ? i !== idx : i < idx);
+    });
   }
-  const root = h("div", { class: "block stepper" }, h("h3", { class: "block-title" }, "🪜 " + (b.title || "")), stage, dots, h("div", { class: "row" }, prev, next, meta));
-  go(0); return root;
+  const ctl = stepControls(b.steps.length, idx => sync(idx));
+  const allBtn = h("button", { class: "btn ghost sm", type: "button", onclick: () => {
+    showAll = !showAll; allBtn.textContent = showAll ? t("stepByStep") : t("showAll"); sync(ctl.idx);
+  } }, t("showAll"));
+  ctl.row.append(allBtn);
+  const rowsEl = h("div", { class: "dv-rows" }, rows.map(r => r.el));
+  const root = h("div", { class: "block derivation" },
+    h("h3", { class: "block-title" }, "🧮 " + (b.title || t("derivation"))),
+    b.intro ? h("div", { html: md(b.intro) }) : null,
+    rowsEl, ctl.dots, ctl.row,
+    b.result ? h("div", { class: "dv-result" }, h("strong", null, t("result") + ": "), h("span", { html: tex2mml(String(b.result), false) })) : null,
+    b.note ? h("div", { class: "text", html: md(b.note) }) : null);
+  ctl.go(0); return root;
 }
 function revealBlock(b) {
   const ans = h("div", { class: "answer", html: md(b.md) });
