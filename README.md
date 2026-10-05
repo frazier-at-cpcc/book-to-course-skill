@@ -58,6 +58,10 @@ These screenshots show a course generated from a Go programming book:
 
 Starting the course this way requires Python 3. Programming exercises also require the relevant language and test tools, such as Go for a Go course. You can open `index.html` directly without the server; quizzes and lessons still work, while progress stays in the browser and code tests must be run in a terminal.
 
+### Exporting to an LMS as SCORM
+
+Ask Claude for SCORM packages, or run `python3 book-to-course/scripts/export_scorm.py <course-dir>` yourself after a build. It writes one zip per chapter (SCORM 1.2 by default, `--scorm 2004` on request) that you upload to Moodle, Canvas, Blackboard, Brightspace or another LMS as separate activities. The LMS records each chapter's progress, completion, and chapter-test score. Code exercises can't run tests inside an LMS, so learners run the shown command on their own computer and mark the exercise done.
+
 The skill and its supporting scripts, templates, and references are in [`book-to-course/`](book-to-course/SKILL.md). Generated courses are self-contained folders that can be packaged and shared.
 
 ## License

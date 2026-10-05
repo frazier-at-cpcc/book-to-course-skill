@@ -1,5 +1,6 @@
-/* Book-to-course player. No dependencies. Works from file:// (progress in browser)
-   and through serve.py (progress in progress/progress.json, tests runnable from the page). */
+/* Book-to-course player. No dependencies. Works from file:// (progress in browser),
+   through serve.py (progress in progress/progress.json, tests runnable from the page)
+   and inside an LMS as a SCORM 1.2 / 2004 package (progress in cmi.suspend_data, see export_scorm.py). */
 (function () {
 "use strict";
 const C = window.COURSE;
@@ -503,6 +504,83 @@ function sanitizeSvg(src) {
   return tpl.innerHTML;
 }
 
+/* ───────────── SCORM (only when built by export_scorm.py: C.meta.scorm is set) ─────────────
+   One package = one chapter = one SCO. The LMS gets: progress as JSON in suspend_data, the lesson
+   being read as location, completion when every lesson of the chapter is finished, and the chapter
+   test's best score (passed/failed against its pass_score). */
+const SCORM = (function () {
+  const cfg = C.meta.scorm; if (!cfg) return null;
+  const v2004 = String(cfg.version) === "2004";
+  const K = v2004
+    ? { init: "Initialize", get: "GetValue", set: "SetValue", commit: "Commit", fin: "Terminate", data: "cmi.suspend_data", loc: "cmi.location", exit: "cmi.exit", time: "cmi.session_time", raw: "cmi.score.raw", min: "cmi.score.min", max: "cmi.score.max", entry: "cmi.entry" }
+    : { init: "LMSInitialize", get: "LMSGetValue", set: "LMSSetValue", commit: "LMSCommit", fin: "LMSFinish", data: "cmi.suspend_data", loc: "cmi.core.lesson_location", exit: "cmi.core.exit", time: "cmi.core.session_time", raw: "cmi.core.score.raw", min: "cmi.core.score.min", max: "cmi.core.score.max", entry: "cmi.core.entry" };
+  const DATA_LIMIT = v2004 ? 64000 : 4096;
+  function find(w) {
+    for (let i = 0; w && i < 10; i++) {
+      try { const a = v2004 ? w.API_1484_11 : w.API; if (a) return a; } catch (e) { return null; }
+      if (w.parent === w) break; w = w.parent;
+    }
+    return null;
+  }
+  let api = find(window); if (!api && window.opener) api = find(window.opener);
+  let live = false, finished = false; const started = Date.now();
+  const get = k => { try { return String(api[K.get](k) || ""); } catch (e) { return ""; } };
+  const set = (k, val) => { try { return String(api[K.set](k, String(val))) === "true"; } catch (e) { return false; } };
+  function duration(ms) {
+    const s = Math.max(0, Math.round(ms / 1000)), hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
+    if (v2004) return "PT" + hh + "H" + mm + "M" + ss + "S";
+    const p2 = n => (n < 10 ? "0" : "") + n; return (hh < 1000 ? ("000" + hh).slice(-4) : String(hh)) + ":" + p2(mm) + ":" + p2(ss);
+  }
+  /* SCORM 1.2 allows only 4096 characters of suspend_data — drop detail until progress fits */
+  function pack(p) {
+    let s = JSON.stringify(p); if (s.length <= DATA_LIMIT) return s;
+    const slim = { version: p.version, last: p.last, updated: p.updated, lessons: {}, quizzes: {}, exercises: {}, cards: {} };
+    Object.keys(p.lessons).forEach(id => { if (p.lessons[id].completed) slim.lessons[id] = { completed: true }; else if (p.lessons[id].visited) slim.lessons[id] = { visited: true }; });
+    Object.keys(p.quizzes).forEach(id => { const q = p.quizzes[id]; slim.quizzes[id] = { attempts: q.attempts, best: q.best, correct: q.correct, passed: q.passed }; });
+    Object.keys(p.exercises).forEach(id => { slim.exercises[id] = { status: p.exercises[id].status }; });
+    s = JSON.stringify(slim); if (s.length <= DATA_LIMIT) return s;
+    slim.cards = {}; Object.keys(slim.quizzes).forEach(id => { delete slim.quizzes[id].correct; });
+    s = JSON.stringify(slim); if (s.length <= DATA_LIMIT) return s;
+    Object.keys(slim.lessons).forEach(id => { if (!slim.lessons[id].completed) delete slim.lessons[id]; });
+    return JSON.stringify(slim).slice(0, DATA_LIMIT); /* last resort; parse() then falls back to localStorage */
+  }
+  return {
+    get available() { return !!api; },
+    get live() { return live; },
+    start() {
+      if (!api) return null;
+      try { live = String(api[K.init]("")) === "true"; } catch (e) { live = false; }
+      if (!live) return null;
+      if (get(K.entry) === "ab-initio" || !get(K.data)) return null;
+      try { return JSON.parse(get(K.data)); } catch (e) { return null; }
+    },
+    /* status = { done, total, testScore (0..1 or null), testPassed, hasTest } */
+    report(p, st) {
+      if (!live || finished) return;
+      set(K.data, pack(p)); if (p.last) set(K.loc, p.last);
+      if (st.testScore != null) { set(K.min, 0); set(K.max, 100); set(K.raw, Math.round(st.testScore * 100)); }
+      const complete = st.total > 0 && st.done === st.total;
+      if (v2004) {
+        set("cmi.progress_measure", st.total ? (st.done / st.total).toFixed(2) : 0);
+        set("cmi.completion_status", complete ? "completed" : "incomplete");
+        if (st.testScore != null) set("cmi.score.scaled", st.testScore.toFixed(4));
+        set("cmi.success_status", !st.hasTest ? (complete ? "passed" : "unknown") : st.testPassed ? "passed" : st.testScore != null ? "failed" : "unknown");
+      } else {
+        /* "failed" is final in some LMSs, so a failed attempt stays "incomplete" and the learner can retake the test */
+        set("cmi.core.lesson_status", complete ? (st.hasTest ? "passed" : "completed") : "incomplete");
+      }
+      set(K.exit, "suspend");
+      try { api[K.commit](""); } catch (e) { /* ignore */ }
+    },
+    finish() {
+      if (!live || finished) return;
+      set(K.time, duration(Date.now() - started)); set(K.exit, "suspend");
+      try { api[K.commit](""); } catch (e) { /* ignore */ }
+      finished = true; try { api[K.fin](""); } catch (e) { /* ignore */ }
+    },
+  };
+})();
+
 /* ───────────── progress storage ───────────── */
 let P = { version: 1, lessons: {}, quizzes: {}, exercises: {}, cards: {}, last: null, updated: null };
 let serverMode = false, saveTimer = null;
@@ -512,6 +590,14 @@ async function loadProgress() {
   let local = null;
   try { local = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { /* ignore */ }
   let remote = null;
+  if (SCORM) {
+    const fromLms = SCORM.start();
+    const pick = fromLms || (SCORM.live ? null : local);  /* the LMS is the record; a fresh LMS attempt starts clean */
+    if (pick && typeof pick === "object") P = Object.assign({ version: 1, lessons: {}, quizzes: {}, exercises: {}, cards: {}, last: null, updated: null }, pick);
+    window.addEventListener("pagehide", () => { scormReport(); SCORM.finish(); });
+    window.addEventListener("beforeunload", () => { scormReport(); SCORM.finish(); });
+    return;
+  }
   if (location.protocol.indexOf("http") === 0) {
     try {
       const r = await fetch("api/ping", { cache: "no-store" });
@@ -530,13 +616,25 @@ function save(now) {
     fetch("api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(P) }).then(r => { if (!r.ok) throw new Error(); setSaveState(); }).catch(() => { const s = $("#saveState"); if (s) s.textContent = "⚠ " + t("serverErr"); });
   };
   clearTimeout(saveTimer);
-  if (now) doPost(); else saveTimer = setTimeout(doPost, 350);
+  if (SCORM) saveTimer = setTimeout(scormReport, now ? 0 : 350);
+  else if (now) doPost(); else saveTimer = setTimeout(doPost, 350);
   setSaveState(); refreshChrome();
 }
-function setSaveState() { const s = $("#saveState"); if (s) s.textContent = serverMode ? t("savedFile") : t("savedBrowser"); }
+function savedWhere() { return SCORM && SCORM.live ? t("savedLms") : serverMode ? t("savedFile") : t("savedBrowser"); }
+function setSaveState() { const s = $("#saveState"); if (s) s.textContent = savedWhere(); }
+function scormReport() {
+  if (!SCORM) return;
+  let tests = 0, best = 0, passed = true;
+  ORDER.forEach(id => { const les = C.lessons[id]; if (les.kind !== "test") return;
+    allBlocks(les).forEach(b => { if (b.type !== "quiz") return; tests++; const q = P.quizzes[b.id]; best += q ? q.best || 0 : 0; if (!(q && q.passed)) passed = false; });
+  });
+  const attempted = ORDER.some(id => C.lessons[id].kind === "test" && allBlocks(C.lessons[id]).some(b => b.type === "quiz" && P.quizzes[b.id] && P.quizzes[b.id].attempts));
+  SCORM.report(P, { done: ORDER.filter(lessonDone).length, total: ORDER.length, hasTest: tests > 0, testPassed: tests > 0 && passed, testScore: tests && attempted ? best / tests : null });
+}
 
 /* ───────────── course model helpers ───────────── */
 const ORDER = []; const CH_OF = {};
+const chNum = ci => (C.chapters[ci] && C.chapters[ci].number) || ci + 1;
 C.chapters.forEach((ch, ci) => ch.lessons.forEach(id => { ORDER.push(id); CH_OF[id] = ci; }));
 const lessonDone = id => !!(P.lessons[id] && P.lessons[id].completed);
 const lessonStarted = id => !!(P.lessons[id] && (P.lessons[id].visited || P.lessons[id].completed));
@@ -837,7 +935,7 @@ function exerciseBlock(b, les) {
       run.disabled = false; run.textContent = "▶ " + t("runTests");
     };
     actions.append(run);
-    if (!serverMode) root.append(h("div", { class: "note-small", style: "margin-top:8px" }, "ℹ️ " + t("noServer")));
+    if (!serverMode) root.append(h("div", { class: "note-small", style: "margin-top:8px" }, "ℹ️ " + t(SCORM ? "noServerLms" : "noServer")));
   } else if (b.checklist && b.checklist.length) {
     root.append(h("h4", null, t("checklist")), h("ul", { class: "checklist" }, b.checklist.map((c, i) => h("li", null, h("label", null,
       h("input", Object.assign({ type: "checkbox", onchange: e => { const k = st.checked.indexOf(i); if (e.target.checked && k < 0) st.checked.push(i); if (!e.target.checked && k >= 0) st.checked.splice(k, 1); save(); } }, st.checked.indexOf(i) >= 0 ? { checked: true } : {})), h("span", { html: inline(c) }))))));
@@ -907,9 +1005,9 @@ function renderHome() {
   fill(el,
     h("div", { class: "hero block" }, h("div", { class: "hero-text" }, h("h1", null, C.meta.title), C.meta.subtitle ? h("p", { class: "lead", style: "margin:0 0 6px" }, C.meta.subtitle) : null, C.meta.description ? h("div", { class: "text", html: md(C.meta.description) }) : null, doneAll ? h("p", null, h("strong", null, t("courseDone"))) : cta), ring(pct)),
     h("div", { class: "stats block" }, h("div", { class: "stat" }, h("b", null, ORDER.filter(lessonDone).length + "/" + ORDER.length), h("span", null, t("lessonsDone"))), h("div", { class: "stat" }, h("b", null, ex.p + "/" + ex.t), h("span", null, t("exercisesDone"))), h("div", { class: "stat" }, h("b", null, qz.c + "/" + qz.t), h("span", null, t("quizScore"))), h("div", { class: "stat" }, h("b", null, "~" + minLeft + " " + t("min")), h("span", null, t("minLeft") + "…"))),
-    C.chapters.map((ch, ci) => h("section", { class: "ch-card block" }, h("h3", null, h("span", { class: "ch-num" }, ci + 1), ch.title, h("span", { class: "chip", style: "margin-left:auto" }, chapterPct(ch) + "%")), ch.summary ? h("div", { class: "note-small", html: inline(ch.summary) }) : null, h("div", { class: "bar", style: "margin-top:10px" }, h("div", { class: "bar-fill", style: "width:" + chapterPct(ch) + "%" })),
+    C.chapters.map((ch, ci) => h("section", { class: "ch-card block" }, h("h3", null, h("span", { class: "ch-num" }, chNum(ci)), ch.title, h("span", { class: "chip", style: "margin-left:auto" }, chapterPct(ch) + "%")), ch.summary ? h("div", { class: "note-small", html: inline(ch.summary) }) : null, h("div", { class: "bar", style: "margin-top:10px" }, h("div", { class: "bar-fill", style: "width:" + chapterPct(ch) + "%" })),
       h("ul", null, ch.lessons.map(id => h("li", null, h("a", { href: "#/lesson/" + id }, h("span", { class: "st" }, lessonDone(id) ? "✓" : lessonStarted(id) ? "◐" : "○"), C.lessons[id].title + (C.lessons[id].kind === "test" ? " 🏁" : ""))))))),
-    h("div", { class: "footer-tools" }, h("span", null, serverMode ? t("progressFile") : t("savedBrowser")), h("button", { class: "btn ghost sm", type: "button", onclick: () => { if (confirm(t("resetConfirm"))) { P = { version: 1, lessons: {}, quizzes: {}, exercises: {}, cards: {}, last: null, updated: null }; save(true); route(); } } }, t("reset"))));
+    h("div", { class: "footer-tools" }, h("span", null, SCORM && SCORM.live ? t("savedLms") : serverMode ? t("progressFile") : t("savedBrowser")), h("button", { class: "btn ghost sm", type: "button", onclick: () => { if (confirm(t("resetConfirm"))) { P = { version: 1, lessons: {}, quizzes: {}, exercises: {}, cards: {}, last: null, updated: null }; save(true); route(); } } }, t("reset"))));
   armReveal(el);
 }
 function renderGlossary() {
@@ -927,7 +1025,7 @@ function renderLesson(id) {
   const ci = CH_OF[id], ch = C.chapters[ci]; const pos = ORDER.indexOf(id);
   P.last = id; const lp = (P.lessons[id] = P.lessons[id] || {}); if (!lp.visited) lp.visited = new Date().toISOString(); save();
   const isTest = les.kind === "test";
-  const frag = [h("div", { class: "crumb" }, t("chOf", ci + 1) + " · " + ch.title), h("h1", null, les.title),
+  const frag = [h("div", { class: "crumb" }, t("chOf", chNum(ci)) + " · " + ch.title), h("h1", null, les.title),
     h("div", { class: "chips" }, h("span", { class: "chip" }, "⏱ ~" + (les.minutes || 10) + " " + t("min")), h("span", { class: "chip accent" }, isTest ? t("test") : t("lesson")), lessonDone(id) ? h("span", { class: "chip ok" }, "✓ " + t("lessonDone")) : null),
     les.summary ? h("p", { class: "lead" }, les.summary) : null];
   allBlocks(les).forEach(b => frag.push(renderBlock(b, les)));
@@ -957,7 +1055,7 @@ function renderSidebar(current) {
   const firstRender = !sb.children.length; const curCh = current && CH_OF[current] != null ? C.chapters[CH_OF[current]].id : null;
   fill(sb, h("a", { class: "nav-home" + (current === "home" ? " active" : ""), href: "#/home" }, "🏠 " + t("home")), h("a", { class: "nav-gloss" + (current === "glossary" ? " active" : ""), href: "#/glossary" }, "📚 " + t("glossary")),
     C.chapters.map((ch, ci) => {
-      const d = h("details", { class: "nav-ch", "data-ch": ch.id }, h("summary", null, h("span", null, (ci + 1) + ". " + ch.title), h("span", { class: "ch-pct" }, chapterPct(ch) + "%")),
+      const d = h("details", { class: "nav-ch", "data-ch": ch.id }, h("summary", null, h("span", null, chNum(ci) + ". " + ch.title), h("span", { class: "ch-pct" }, chapterPct(ch) + "%")),
         ch.lessons.map(id => h("a", { class: "nav-lesson" + (lessonDone(id) ? " done" : lessonStarted(id) ? " started" : "") + (current === id ? " active" : "") + (C.lessons[id].kind === "test" ? " is-test" : ""), href: "#/lesson/" + id }, h("span", { class: "st" }, lessonDone(id) ? "✓" : ""), h("span", { class: "t" }, C.lessons[id].title))));
       if (firstRender ? ch.id === curCh || ci === 0 && !curCh : openChs.has(ch.id) || ch.id === curCh) d.setAttribute("open", ""); return d;
     }));

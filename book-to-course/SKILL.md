@@ -1,6 +1,6 @@
 ---
 name: book-to-course
-description: Turn a book or document (EPUB, PDF, HTML, DOCX, Markdown, TXT — e.g. a programming course book) into a complete interactive beginner-friendly course delivered as a local web page, with step-by-step explanations, animations, quizzes, chapter tests, flashcards, hints, programming exercises checked by unit tests, and learner progress saved to files. Use this skill whenever the user uploads or mentions a book/ebook/PDF/EPUB/tutorial/lecture notes and wants to LEARN from it, wants a "kurs interaktywny", "kurs z książki", "zrób z tego kurs/naukę", an interactive course, study site, quiz/exercise version of a book, or says to continue/extend an existing generated course ("następny rozdział", "kontynuuj kurs"). Use it even if they don't say "skill" or "course" explicitly but describe turning reading material into something to study interactively. Do NOT use for plain summaries, a single quiz, or translating a book.
+description: Turn a book or document (EPUB, PDF, HTML, DOCX, Markdown, TXT — e.g. a programming course book) into a complete interactive beginner-friendly course delivered as a local web page, with step-by-step explanations, animations, quizzes, chapter tests, flashcards, hints, programming exercises checked by unit tests, and learner progress saved to files. Use this skill whenever the user uploads or mentions a book/ebook/PDF/EPUB/tutorial/lecture notes and wants to LEARN from it, wants a "kurs interaktywny", "kurs z książki", "zrób z tego kurs/naukę", an interactive course, study site, quiz/exercise version of a book, or says to continue/extend an existing generated course ("następny rozdział", "kontynuuj kurs"), or wants such a course exported as SCORM packages (one per chapter) for an LMS such as Moodle, Canvas, Blackboard or Brightspace. Use it even if they don't say "skill" or "course" explicitly but describe turning reading material into something to study interactively. Do NOT use for plain summaries, a single quiz, or translating a book.
 ---
 
 # Book → interactive course
@@ -32,6 +32,7 @@ Scripts (all in `scripts/`, standard library only):
 | `build_course.py DIR [--single-file OUT.html]` | validate lessons, print theory/practice balance, write `course/data.js` |
 | `verify_exercises.py DIR` | tests must FAIL on starter and PASS on solution |
 | `pack_course.py DIR [--share]` | zip for delivery / later continuation |
+| `export_scorm.py DIR [--scorm 1.2\|2004] [--chapters ID,…] [-o OUTDIR]` | one SCORM package (zip) per chapter, for upload to an LMS |
 
 ## Workflow
 
@@ -100,7 +101,26 @@ built course is fully usable: unfinished chapters simply don't appear yet.
 2. `verify_exercises.py DIR` → all OK. A SKIPPED exercise was not verified: say so plainly.
 3. Optional but valuable: serve and look at it (`python3 serve.py --no-browser &`, then a headless browser or the built-in browser) — check one lesson renders and a quiz works.
 4. `pack_course.py DIR` and send the zip with SendUserFile. If a folder on the user's computer is linked and they asked for it there, write the course into that folder instead.
-5. Tell the user in 3–5 lines: unzip, run `start.bat` / `./start.sh` (needs Python 3) or just open `index.html`; progress lives in `progress/`; what is covered and what is next (if partial). `build_course.py --single-file preview.html` yields one HTML file for a quick look without unzipping (progress then stays in the browser).
+5. If the user wants the course in an LMS (Moodle, Canvas, Blackboard, Brightspace, "SCORM"), also run
+   `export_scorm.py DIR` and send the chapter zips — see "SCORM export" below.
+6. Tell the user in 3–5 lines: unzip, run `start.bat` / `./start.sh` (needs Python 3) or just open `index.html`; progress lives in `progress/`; what is covered and what is next (if partial). `build_course.py --single-file preview.html` yields one HTML file for a quick look without unzipping (progress then stays in the browser).
+
+## SCORM export (one package per chapter)
+
+When the user asks for SCORM, LMS upload, or "a package per chapter", run after a clean build:
+```bash
+python3 scripts/export_scorm.py <course-dir>                    # SCORM 1.2, every built chapter → <course-dir>-scorm/NN-<id>.zip
+python3 scripts/export_scorm.py <course-dir> --scorm 2004 --chapters ch03,ch04
+```
+Each zip is a single SCO holding that chapter's lessons, test and glossary terms; chapter numbers stay as in the full
+course. Inside the LMS the player keeps progress in `cmi.suspend_data`, the current lesson in the location field, reports
+completion once every lesson of the chapter is finished, and reports the chapter test's best score (raw 0–100). The
+chapter counts as passed when its test is passed; a chapter without a test reports completion only. Default to 1.2 (every
+LMS takes it); pick 2004 when the user names it or when chapters have many quizzes and flashcards, because 1.2 allows only
+4 KB of suspend data and the player then drops per-question and flashcard detail (completion and scores are always kept).
+Packages contain no `serve.py`, so unit-test exercises can't run from the page: the learner sees the starter files, tests
+and command, runs them on their own computer, and marks the exercise passed. Tell the user this when the course has such
+exercises, and that each chapter zip is uploaded as its own SCORM activity.
 
 ## What makes a good result (and why)
 
@@ -125,5 +145,6 @@ built course is fully usable: unfinished chapters simply don't appear yet.
 
 - `build_course.py` refuses to write `data.js` while errors remain — fix them (messages name file, block and field). `--force` writes anyway (don't use for delivery).
 - Page is blank → `course/data.js` missing or invalid; rerun `build_course.py`.
-- "Run tests" button disabled → page was opened as a file; use `start.sh`/`start.bat`. The command to run by hand is shown on each exercise.
+- "Run tests" button disabled → page was opened as a file; use `start.sh`/`start.bat`. The command to run by hand is shown on each exercise. In a SCORM package this is expected (no helper server in an LMS).
+- SCORM package shows "saved in browser" instead of "saved in your LMS" → the LMS's SCORM API was not found (package opened outside the LMS, or uploaded as plain files instead of a SCORM activity). Progress then only lives in that browser.
 - Test toolchain missing on the learner's computer (e.g. no Go) → the exercise page says which program is needed; mention installation links in the course intro for the language taught.
